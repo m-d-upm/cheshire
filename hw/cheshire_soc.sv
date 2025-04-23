@@ -1714,7 +1714,7 @@ module cheshire_soc import cheshire_pkg::*; #(
   //     IOMMU     //
   ///////////////////
 
-  if(Cfg.IOMMU) begin: gen_iommu
+  if(Cfg.Iommu) begin: gen_iommu
 
     axi_iommu_req_t     axi_iommu_tr_req;
     axi_mst_iommu_req_t axi_iommu_comp_req, axi_iommu_ds_req;
