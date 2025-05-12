@@ -4,5 +4,4 @@
 	ignore = dirty
 [submodule "sw/deps/cva6-sdk"]
 	path = sw/deps/cva6-sdk
-	url = https://github.com/pulp-platform/cva6-sdk.git
-	ignore = dirty
+	url = https://github.com/m-d-upm/cva6-sdk.git
