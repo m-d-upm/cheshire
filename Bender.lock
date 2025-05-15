@@ -204,6 +204,22 @@ packages:
     - axi
     - common_cells
     - register_interface
+  strela:
+    revision: c7659fdfbba429056c94bde9780b92694d17fdb0
+    version: null
+    source:
+      Git: https://github.com/m-d-upm/strela.git
+    dependencies: []
+  strela_cva6:
+    revision: a261a698568e71c7722aed7a00a5c897a2500c14
+    version: null
+    source:
+      Git: https://github.com/m-d-upm/strela_cva6.git
+    dependencies:
+    - axi
+    - common_cells
+    - register_interface
+    - strela
   tech_cells_generic:
     revision: 7968dd6e6180df2c644636bc6d2908a49f2190cf
     version: 0.2.13

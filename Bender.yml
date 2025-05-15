@@ -32,6 +32,7 @@ dependencies:
   unbent:                   { git: "https://github.com/pulp-platform/unbent.git",                 version: 0.1.6  }
   dram_rtl_sim:             { git: "https://github.com/pulp-platform/dram_rtl_sim.git",           version: 0.1.1  }
   riscv-iommu:              { git: "https://github.com/m-d-upm/riscv-iommu.git",                  rev: myrtus  }
+  strela_cva6:              { git: "https://github.com/m-d-upm/strela_cva6.git",                  rev: myrtus  }
 
 export_include_dirs:
   - hw/include
