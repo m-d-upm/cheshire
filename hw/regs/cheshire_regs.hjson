@@ -103,7 +103,6 @@
         { bits: "11", name: "clic",         desc: "Whether CLIC is available"         }
         { bits: "12", name: "irq_router",   desc: "Whether IRQ router is available"   }
         { bits: "13", name: "bus_err",      desc: "Whether UNBENT is available"       }
-        { bits: "14", name: "iommu",        desc: "Whether IOMMU is available"        }
       ]
     }
 

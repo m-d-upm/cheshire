@@ -138,7 +138,6 @@ package cheshire_pkg;
     bit     Clic;
     bit     IrqRouter;
     bit     BusErr;
-    bit     Iommu;
     // Parameters for Debug Module
     jtag_idcode_t DbgIdCode;
     dw_bt   DbgMaxReqs;
@@ -239,7 +238,6 @@ package cheshire_pkg;
     logic i2c_fmt_threshold;
     logic uart;
     logic zero;
-    logic [3:0] iommu;
   } cheshire_int_intr_t;
 
   typedef struct packed {
@@ -303,7 +301,6 @@ package cheshire_pkg;
     aw_bt usb;
     aw_bt ext_base;
     aw_bt num_in;
-    aw_bt iommu;
   } axi_in_t;
 
   function automatic axi_in_t gen_axi_in(cheshire_cfg_t cfg);
@@ -315,7 +312,6 @@ package cheshire_pkg;
     if (cfg.SerialLink) begin i++; ret.slink = i; end
     if (cfg.Vga)        begin i++; ret.vga   = i; end
     if (cfg.Usb)        begin i++; ret.usb   = i; end
-    if (cfg.Iommu)      begin i++; ret.iommu = i; end
     i++;
     ret.ext_base = i;
     ret.num_in = i + cfg.AxiExtNumMst;
@@ -340,7 +336,6 @@ package cheshire_pkg;
     aw_bt ext_base;
     aw_bt num_out;
     aw_bt num_rules;
-    aw_bt iommu;
     arul_t [aw_bt'(-1):0] map;
   } axi_out_t;
 
@@ -363,7 +358,6 @@ package cheshire_pkg;
       r++; ret.map[r] = '{i, AmSpm + 'h0400_0000, AmSpm + 'h0400_0000 + SizeSpm};
     end
     if (cfg.Dma)          begin i++; r++; ret.dma = i; ret.map[r] = '{i, 'h0100_0000, 'h0100_1000}; end
-    if (cfg.Iommu)        begin i++; r++; ret.iommu = i; ret.map[r] = '{i, 'h0100_2000, 'h0100_3000}; end
     if (cfg.SerialLink)   begin i++; r++; ret.slink = i;
         ret.map[r] = '{i, cfg.SlinkRegionStart, cfg.SlinkRegionEnd}; end
     // External port indices start after internal ones
@@ -618,7 +612,6 @@ package cheshire_pkg;
     Clic              : 0,
     IrqRouter         : 0,
     BusErr            : 1,
-    Iommu             : 1,
     // Debug
     DbgIdCode         : CheshireIdCode,
     DbgMaxReqs        : 4,
