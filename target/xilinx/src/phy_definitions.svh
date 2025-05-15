@@ -28,6 +28,8 @@
   `define USE_USB
   `define USE_STARTUPE2
   `define USE_QSPI
+  `define USE_IOMMU
+  `define USE_CGRA
 `endif
 
 `ifdef TARGET_ZCU102
