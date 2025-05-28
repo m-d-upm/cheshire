@@ -117,14 +117,17 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     ret.Usb = 0;
   `endif
   `ifdef USE_IOMMU_AND_CGRA
-    ret.NumExtInIntrs = 4; // only IOMMU for now
-    ret.AxiExtNumMst = 2;
-    ret.AxiExtNumSlv = 2;
-    ret.AxiExtNumRules = 2;
+    ret.NumExtInIntrs = 8; // only IOMMU for now
+    ret.AxiExtNumMst = 2; // IOMMU x2
+    ret.AxiExtNumSlv = 2; // IOMMU + STRELA
+    ret.AxiExtNumRules = 2; // IOMMU + STRELA
     ret.AxiExtRegionIdx = '{0:0, 1:1, default:0};
-    // 0x2000_0000 to 0x8000_0000
-    ret.AxiExtRegionStart = '{0:'h2000_0000, 1:'h2000_1000, default:0};
-    ret.AxiExtRegionEnd = '{0:'h2000_1000, 1:'h2000_2000, default:0}; // 0x8000_0000 max
+    // 4K periphs @ AXI	from 0x0100_0000 to 0x0200_0000
+    // DMA mapped from 0x0100_0000 to 0x0100_1000
+    // IOMMU from 0x0100_1000 to 0x0100_2000
+    // CGRA from 0x0100_2000 to 0x0100_3000
+    ret.AxiExtRegionStart = '{0:'h0100_1000, 1:'h0100_2000, default:0}; // IOMMU
+    ret.AxiExtRegionEnd = '{0:'h0100_2000, 1:'h0100_3000, default:0}; // STRELA
   `endif
     return ret;
   endfunction
@@ -132,6 +135,8 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   // Configure cheshire for FPGA mapping
   localparam cheshire_cfg_t FPGACfg = gen_cheshire_xilinx_cfg();
   `CHESHIRE_TYPEDEF_ALL(, FPGACfg)
+
+  `CHESHIRE_TYPEDEF_IOMMU(axi_iommu, FPGACfg)
 
   ////////////////////////
   //  Clock Generation  //
@@ -538,6 +543,7 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
 
   // attach CGRA req/rsp interface to the req/rsp struct signals
   `AXI_ASSIGN_FROM_REQ(aux_axi_slaves[FPGACfg.AxiExtRegionIdx[0]], axi_slv_req[FPGACfg.AxiExtRegionIdx[1]])
+  //`AXI_ASSIGN_FROM_REQ(axi_slv_req[FPGACfg.AxiExtRegionIdx[1]], aux_axi_slaves[FPGACfg.AxiExtRegionIdx[0]])
   `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[1]], aux_axi_slaves[FPGACfg.AxiExtRegionIdx[0]])
   
   ///////////////////
@@ -546,50 +552,62 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
 
 `ifdef USE_IOMMU
 
-  logic [3:0] iommu_int; // for interrupts
+  logic [7:0] iommu_int; // for interrupts
 
   axi_iommu_req_t axi_iommu_req;
   axi_iommu_rsp_t axi_iommu_rsp;
 
-  `AXI_ASSIGN_FROM_REQ(aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]], axi_iommu_req)
-  `AXI_ASSIGN_TO_RESP(axi_iommu_rsp, aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]])
+  // from the AXI Master interface of the STRELA CGRA to the struct going into IOMMU slave port
+  `AXI_ASSIGN_TO_REQ(axi_iommu_req, aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]])
+  `AXI_ASSIGN_FROM_RESP(aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]], axi_iommu_rsp)
 
+  // AW
   assign axi_iommu_req.aw.stream_id = '0;
   assign axi_iommu_req.aw.ss_id_valid = '1;
   assign axi_iommu_req.aw.substream_id = '0;
+  
+  // AR
   assign axi_iommu_req.ar.stream_id = '0;
   assign axi_iommu_req.ar.ss_id_valid = '1;
   assign axi_iommu_req.ar.substream_id = '0;
+
+  // AW
+  //assign axi_iommu_req.aw.stream_id    = aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]].aw_stream_id;
+  //assign axi_iommu_req.aw.ss_id_valid  = aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]].aw_ss_id_valid;
+  //assign axi_iommu_req.aw.substream_id = aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]].aw_substream_id;
+  //assign axi_iommu_req.aw.nsaid        = aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]].aw_nsaid;
+
+  // AR
+  //assign axi_iommu_req.ar.stream_id    = aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]].ar_stream_id;
+  //assign axi_iommu_req.ar.ss_id_valid  = aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]].ar_ss_id_valid;
+  //assign axi_iommu_req.ar.substream_id = aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]].ar_substream_id;
+  //assign axi_iommu_req.ar.nsaid        = idma_axaux_axi_masters[FPGACfg.AxiExtRegionIdx[0]]i_master.ar_nsaid;
     
+	//`REG_BUS_TYPEDEF_ALL(iommu_reg, ariane_axi_soc::addr_t, logic [31:0], logic[3:0])
+
   riscv_iommu #(
-    .IOTLB_ENTRIES   ( 8                       ),
-    .DDTC_ENTRIES    ( 4                       ),
-    .PDTC_ENTRIES    ( 4                       ),
-    .MRIFC_ENTRIES   ( 4                       ),
-    .MSITrans        ( rv_iommu::MSI_DISABLED  ),
-    .InclPC          ( 1'b0                    ),
-    .InclBC          ( 1'b1                    ),
-    .InclDBG         ( 1'b1                    ),
-    .IGS             ( rv_iommu::WSI_ONLY      ),
-    .N_INT_VEC       ( 4                       ),
-    .N_IOHPMCTR      ( 8                       ),
-    .ADDR_WIDTH      ( 56                      ),
-    .DATA_WIDTH      ( FPGACfg.AxiDataWidth    ),
-    .ID_WIDTH        ( FPGACfg.AxiMstIdWidth   ),
-    .ID_SLV_WIDTH    ( AxiSlvIdWidth           ),
-    .USER_WIDTH      ( FPGACfg.AxiUserWidth    ),
-    .aw_chan_t       ( axi_mst_iommu_aw_chan_t ),
-    .w_chan_t        ( axi_mst_iommu_w_chan_t  ),
-    .b_chan_t        ( axi_mst_iommu_b_chan_t  ),
-    .ar_chan_t       ( axi_mst_iommu_ar_chan_t ),
-    .r_chan_t        ( axi_mst_iommu_r_chan_t  ),
-    .axi_req_t       ( axi_mst_iommu_req_t     ),
-    .axi_rsp_t       ( axi_mst_iommu_rsp_t     ),
-    .axi_req_slv_t   ( axi_slv_iommu_req_t     ),
-    .axi_rsp_slv_t   ( axi_slv_iommu_rsp_t     ),
-    .axi_req_iommu_t ( axi_iommu_req_t         ),
-    .reg_req_t       ( reg_req_t               ),
-    .reg_rsp_t       ( reg_rsp_t               )
+    .InclPC           ( 0                               ),
+    .InclBC           ( 0                               ),
+    .InclDBG          ( 1                               ),
+    .N_INT_VEC        ( 8                               ),
+    .ADDR_WIDTH			  ( FPGACfg.AddrWidth               ),
+    .DATA_WIDTH			  ( FPGACfg.AxiDataWidth            ),
+    .ID_WIDTH			    ( FPGACfg.AxiMstIdWidth        ),
+    //.ID_SLV_WIDTH		  ( FPGACfg.AxiMstIdWidth           ),
+    .ID_SLV_WIDTH		  ( AxiSlvIdWidth                   ),
+    .USER_WIDTH			  ( FPGACfg.AxiUserWidth            ),
+    .aw_chan_t			  ( axi_mst_aw_chan_t               ),
+    .w_chan_t			    ( axi_mst_w_chan_t                ),
+    .b_chan_t			    ( axi_mst_b_chan_t                ),
+    .ar_chan_t			  ( axi_mst_ar_chan_t               ),
+    .r_chan_t		      ( axi_mst_r_chan_t                ),
+    .axi_req_t			  ( axi_mst_req_t                   ),
+    .axi_rsp_t			  ( axi_mst_rsp_t                   ),
+    .axi_req_slv_t		( axi_slv_req_t                   ),
+    .axi_rsp_slv_t		( axi_slv_rsp_t                   ),
+    .axi_req_iommu_t  ( axi_iommu_req_t                 ),
+    .reg_req_t		    ( reg_req_t                       ),
+    .reg_rsp_t		    ( reg_rsp_t                       )
   ) i_cgra_iommu (
     .clk_i            ( soc_clk ),
     .rst_ni           ( rst_n ),
