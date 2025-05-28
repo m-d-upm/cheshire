@@ -131,7 +131,7 @@ package cheshire_reg_pkg;
   parameter logic [31:0] CHESHIRE_RTC_FREQ_RESVAL = 32'h 0;
   parameter logic [31:0] CHESHIRE_PLATFORM_ROM_RESVAL = 32'h 0;
   parameter logic [31:0] CHESHIRE_NUM_INT_HARTS_RESVAL = 32'h 0;
-  parameter logic [14:0] CHESHIRE_HW_FEATURES_RESVAL = 14'h 0;
+  parameter logic [13:0] CHESHIRE_HW_FEATURES_RESVAL = 14'h 0;
   parameter logic [31:0] CHESHIRE_LLC_SIZE_RESVAL = 32'h 0;
   parameter logic [23:0] CHESHIRE_VGA_PARAMS_RESVAL = 24'h 0;
 
@@ -190,4 +190,3 @@ package cheshire_reg_pkg;
   };
 
 endpackage
-
