@@ -31,6 +31,8 @@ SECTIONS {
 
   /* Further addresses */
   __base_dma      = 0x01000000;
+  __base_iommu    = 0x01001000;
+  __base_cgra     = 0x01002000;
   __base_bootrom  = 0x02000000;
   __base_clint    = 0x02040000;
   __base_axirt    = 0x020C0000;
