@@ -543,7 +543,6 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
 
   // attach CGRA req/rsp interface to the req/rsp struct signals
   `AXI_ASSIGN_FROM_REQ(aux_axi_slaves[FPGACfg.AxiExtRegionIdx[0]], axi_slv_req[FPGACfg.AxiExtRegionIdx[1]])
-  //`AXI_ASSIGN_FROM_REQ(axi_slv_req[FPGACfg.AxiExtRegionIdx[1]], aux_axi_slaves[FPGACfg.AxiExtRegionIdx[0]])
   `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[1]], aux_axi_slaves[FPGACfg.AxiExtRegionIdx[0]])
   
   ///////////////////
@@ -571,20 +570,6 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   assign axi_iommu_req.ar.ss_id_valid = '1;
   assign axi_iommu_req.ar.substream_id = '0;
 
-  // AW
-  //assign axi_iommu_req.aw.stream_id    = aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]].aw_stream_id;
-  //assign axi_iommu_req.aw.ss_id_valid  = aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]].aw_ss_id_valid;
-  //assign axi_iommu_req.aw.substream_id = aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]].aw_substream_id;
-  //assign axi_iommu_req.aw.nsaid        = aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]].aw_nsaid;
-
-  // AR
-  //assign axi_iommu_req.ar.stream_id    = aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]].ar_stream_id;
-  //assign axi_iommu_req.ar.ss_id_valid  = aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]].ar_ss_id_valid;
-  //assign axi_iommu_req.ar.substream_id = aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]].ar_substream_id;
-  //assign axi_iommu_req.ar.nsaid        = idma_axaux_axi_masters[FPGACfg.AxiExtRegionIdx[0]]i_master.ar_nsaid;
-    
-	//`REG_BUS_TYPEDEF_ALL(iommu_reg, ariane_axi_soc::addr_t, logic [31:0], logic[3:0])
-
   riscv_iommu #(
     .InclPC           ( 0                               ),
     .InclBC           ( 0                               ),
@@ -592,8 +577,7 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     .N_INT_VEC        ( 8                               ),
     .ADDR_WIDTH			  ( FPGACfg.AddrWidth               ),
     .DATA_WIDTH			  ( FPGACfg.AxiDataWidth            ),
-    .ID_WIDTH			    ( FPGACfg.AxiMstIdWidth        ),
-    //.ID_SLV_WIDTH		  ( FPGACfg.AxiMstIdWidth           ),
+    .ID_WIDTH			    ( FPGACfg.AxiMstIdWidth           ),
     .ID_SLV_WIDTH		  ( AxiSlvIdWidth                   ),
     .USER_WIDTH			  ( FPGACfg.AxiUserWidth            ),
     .aw_chan_t			  ( axi_mst_aw_chan_t               ),
@@ -677,11 +661,18 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     .axi_ext_mst_rsp_o  ( axi_mst_rsp ),
     .axi_ext_slv_req_o  ( axi_slv_req ),
     .axi_ext_slv_rsp_i  ( axi_slv_rsp ),
+    `else
+    .axi_ext_mst_req_i  ( ),
+    .axi_ext_mst_rsp_o  ( '0 ),
+    .axi_ext_slv_req_o  ( ),
+    .axi_ext_slv_rsp_i  ( '0 ),
     `endif
     .reg_ext_slv_req_o  ( ),
     .reg_ext_slv_rsp_i  ( '0 ),
     `ifdef USE_IOMMU_AND_CGRA
     .intr_ext_i         ( iommu_int ),
+    `else
+    .intr_ext_i         ( '0 ),
     `endif
     .intr_ext_o         ( ),
     .xeip_ext_o         ( ),
