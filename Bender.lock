@@ -205,13 +205,13 @@ packages:
     - common_cells
     - register_interface
   strela:
-    revision: c7659fdfbba429056c94bde9780b92694d17fdb0
+    revision: a7c46890434d2f1fe39b666daf95c31c7752dcbc
     version: null
     source:
       Git: https://github.com/m-d-upm/strela.git
     dependencies: []
   strela_cva6:
-    revision: a261a698568e71c7722aed7a00a5c897a2500c14
+    revision: 6d6d6c444ab2bcf6bc08fa6ff5ab8d1d4bb420f1
     version: null
     source:
       Git: https://github.com/m-d-upm/strela_cva6.git
