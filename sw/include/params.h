@@ -36,7 +36,7 @@ extern void *__base_spm;
 extern void *__base_dram;
 
 // Default boot baudrate
-static const uint32_t __BOOT_BAUDRATE = 115200;
+static const uint32_t __BOOT_BAUDRATE = 38400;
 
 // Maximum number of LBAs to copy to SPM for boot (48 KiB)
 static const uint64_t __BOOT_SPM_MAX_LBAS = 2 * 48;
