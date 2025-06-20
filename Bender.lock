@@ -3,16 +3,18 @@ packages:
     revision: 77ddf073f194d44b9119949d2421be59789e69ae
     version: 0.2.4
     source:
-      Git: https://github.com/pulp-platform/apb
+      Git: https://github.com/pulp-platform/apb.git
     dependencies:
     - common_cells
   apb_uart:
-    revision: 6c7dde3d749ac8274377745c105da8c8b8cd27c6
-    version: 0.2.1
+    revision: 8182a85d234417db46fe833533f8536644d3bee3
+    version: 0.2.3
     source:
       Git: https://github.com/pulp-platform/apb_uart.git
     dependencies:
     - apb
+    - obi
+    - obi_peripherals
     - register_interface
   axi:
     revision: f07498d53ecd5518b277c7d213ec3b71ca4df93c
@@ -159,6 +161,14 @@ packages:
     dependencies:
     - common_cells
     - common_verification
+  obi_peripherals:
+    revision: 079894a6cbd4e544c477643d184a4c340bd4e391
+    version: 0.1.1
+    source:
+      Git: https://github.com/pulp-platform/obi_peripherals.git
+    dependencies:
+    - common_cells
+    - obi
   opentitan_peripherals:
     revision: cd3153de2783abd3d03d0595e6c4b32413c62f14
     version: 0.4.0
@@ -205,7 +215,7 @@ packages:
     - common_cells
     - register_interface
   strela:
-    revision: a7c46890434d2f1fe39b666daf95c31c7752dcbc
+    revision: ac5cd002ff7b839f35a7a33888c645a702dd9fd2
     version: null
     source:
       Git: https://github.com/m-d-upm/strela.git
