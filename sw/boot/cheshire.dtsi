@@ -19,7 +19,7 @@
     #address-cells = <2>;
     #size-cells = <2>;
     ranges;
-    stdout-path = "/soc/serial@3002000:115200";
+    stdout-path = "/soc/serial@3002000:38400";
   };
 
   memory@80000000 {
@@ -70,7 +70,7 @@
     serial@3002000 {
       compatible = "ns16550a";
       clock-frequency = <50000000>; // 50 MHz
-      current-speed = <115200>;
+      current-speed = <38400>;
       interrupt-parent = <&PLIC0>;
       interrupts = <1>;
       reg = <0x0 0x3002000 0x0 0x1000>;
@@ -111,8 +111,7 @@
       interrupt-controller;
       interrupts-extended = <&CPU0_intc 11 &CPU0_intc 9>;
       riscv,max-priority = <7>;
-      //riscv,ndev = <51>;
-      riscv,ndev = <59>;
+      riscv,ndev = <51>;
       reg = <0x0 0x4000000 0x0 0x4000000>;
     };
   };
