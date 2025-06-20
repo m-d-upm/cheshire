@@ -117,7 +117,7 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     ret.Usb = 0;
   `endif
   `ifdef USE_IOMMU_AND_CGRA
-    ret.NumExtInIntrs = 8; // only IOMMU for now
+    ret.NumExtInIntrs = 4; // only IOMMU for now
     ret.AxiExtNumMst = 2; // IOMMU x2
     ret.AxiExtNumSlv = 2; // IOMMU + STRELA
     ret.AxiExtNumRules = 2; // IOMMU + STRELA
@@ -521,52 +521,57 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   localparam int unsigned AxiSlvIdWidth = FPGACfg.AxiMstIdWidth + $clog2(local_axi_in.num_in);
 
   // External AXI Master(s)/Slave(s)
-  axi_mst_req_t   [FPGACfg.AxiExtNumMst-1:0] axi_mst_req;
-  axi_mst_rsp_t   [FPGACfg.AxiExtNumMst-1:0] axi_mst_rsp;
+  axi_mst_req_t   [iomsb(FPGACfg.AxiExtNumMst):0] axi_mst_req;
+  axi_mst_rsp_t   [iomsb(FPGACfg.AxiExtNumMst):0] axi_mst_rsp;
 
-  axi_slv_req_t   [FPGACfg.AxiExtNumSlv-1:0] axi_slv_req;
-  axi_slv_rsp_t   [FPGACfg.AxiExtNumSlv-1:0] axi_slv_rsp;
+  axi_slv_req_t   [iomsb(FPGACfg.AxiExtNumSlv):0] axi_slv_req;
+  axi_slv_rsp_t   [iomsb(FPGACfg.AxiExtNumSlv):0] axi_slv_rsp;
   
   AXI_BUS #(
     .AXI_ADDR_WIDTH ( FPGACfg.AddrWidth        ),
     .AXI_DATA_WIDTH ( FPGACfg.AxiDataWidth     ),
     .AXI_ID_WIDTH   ( AxiSlvIdWidth            ),
     .AXI_USER_WIDTH ( FPGACfg.AxiUserWidth     )
-  ) aux_axi_slaves[(FPGACfg.AxiExtNumSlv-1)-1:0](); // not to include the IOMMU, hence why another -1
+  ) aux_axi_slaves();
 
   AXI_BUS #(
       .AXI_ADDR_WIDTH ( FPGACfg.AddrWidth        ),
       .AXI_DATA_WIDTH ( FPGACfg.AxiDataWidth     ),
       .AXI_ID_WIDTH   ( FPGACfg.AxiMstIdWidth    ),
       .AXI_USER_WIDTH ( FPGACfg.AxiUserWidth     )
-  ) aux_axi_masters[(FPGACfg.AxiExtNumMst-1)-1:0](); // not to include the IOMMU, hence why another -1
+  ) aux_axi_masters();
 
   // attach CGRA req/rsp interface to the req/rsp struct signals
-  `AXI_ASSIGN_FROM_REQ(aux_axi_slaves[FPGACfg.AxiExtRegionIdx[0]], axi_slv_req[FPGACfg.AxiExtRegionIdx[1]])
-  `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[1]], aux_axi_slaves[FPGACfg.AxiExtRegionIdx[0]])
+  `AXI_ASSIGN_FROM_REQ(aux_axi_slaves, axi_slv_req[FPGACfg.AxiExtRegionIdx[1]])
+  `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[1]], aux_axi_slaves)
   
   ///////////////////
   //     IOMMU     //
   ///////////////////
 
+
 `ifdef USE_IOMMU
 
-  logic [7:0] iommu_int; // for interrupts
+  logic [3:0] iommu_int; // for interrupts
 
   axi_iommu_req_t axi_iommu_req;
   axi_iommu_rsp_t axi_iommu_rsp;
 
   // from the AXI Master interface of the STRELA CGRA to the struct going into IOMMU slave port
-  `AXI_ASSIGN_TO_REQ(axi_iommu_req, aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]])
-  `AXI_ASSIGN_FROM_RESP(aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]], axi_iommu_rsp)
+  `AXI_ASSIGN_TO_REQ(axi_iommu_req, aux_axi_masters)
+  `AXI_ASSIGN_FROM_RESP(aux_axi_masters, axi_iommu_rsp)
 
   // AW
+  //assign axi_iommu_req.aw.stream_id = '1;
   assign axi_iommu_req.aw.stream_id = '0;
+  //assign axi_iommu_req.aw.ss_id_valid = '0;
   assign axi_iommu_req.aw.ss_id_valid = '1;
   assign axi_iommu_req.aw.substream_id = '0;
   
   // AR
+  //assign axi_iommu_req.ar.stream_id = '1;
   assign axi_iommu_req.ar.stream_id = '0;
+  //assign axi_iommu_req.ar.ss_id_valid = '0;
   assign axi_iommu_req.ar.ss_id_valid = '1;
   assign axi_iommu_req.ar.substream_id = '0;
 
@@ -574,7 +579,11 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     .InclPC           ( 0                               ),
     .InclBC           ( 0                               ),
     .InclDBG          ( 1                               ),
-    .N_INT_VEC        ( 8                               ),
+    .N_INT_VEC        ( 4                               ),
+    .MSITrans         ( rv_iommu::MSI_FLAT_ONLY         ),
+    .IOTLB_ENTRIES    ( 8                               ),
+    .N_IOHPMCTR       ( 8                               ),
+    .IGS              ( rv_iommu::BOTH                  ),
     .ADDR_WIDTH			  ( FPGACfg.AddrWidth               ),
     .DATA_WIDTH			  ( FPGACfg.AxiDataWidth            ),
     .ID_WIDTH			    ( FPGACfg.AxiMstIdWidth           ),
@@ -627,8 +636,8 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   ) i_axi_cgra_top (
     .clk_i                 ( soc_clk      ), // clk
     .rst_ni                ( rst_n     ), // ndmreset_n 
-    .axi_slave_port        ( aux_axi_slaves[FPGACfg.AxiExtRegionIdx[0]] ),
-    .axi_master_port       ( aux_axi_masters[FPGACfg.AxiExtRegionIdx[0]] )
+    .axi_slave_port        ( aux_axi_slaves ),
+    .axi_master_port       ( aux_axi_masters )
   );
 
 `endif
@@ -656,24 +665,24 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     .rtc_i              ( rtc_clk_q       ),
     .axi_llc_mst_req_o  ( axi_llc_mst_req ),
     .axi_llc_mst_rsp_i  ( axi_llc_mst_rsp ),
-    `ifdef USE_IOMMU_AND_CGRA
+  `ifdef USE_IOMMU_AND_CGRA
     .axi_ext_mst_req_i  ( axi_mst_req ),
     .axi_ext_mst_rsp_o  ( axi_mst_rsp ),
     .axi_ext_slv_req_o  ( axi_slv_req ),
     .axi_ext_slv_rsp_i  ( axi_slv_rsp ),
-    `else
+  `else
     .axi_ext_mst_req_i  ( ),
     .axi_ext_mst_rsp_o  ( '0 ),
     .axi_ext_slv_req_o  ( ),
     .axi_ext_slv_rsp_i  ( '0 ),
-    `endif
+  `endif
     .reg_ext_slv_req_o  ( ),
     .reg_ext_slv_rsp_i  ( '0 ),
-    `ifdef USE_IOMMU_AND_CGRA
+  `ifdef USE_IOMMU_AND_CGRA
     .intr_ext_i         ( iommu_int ),
-    `else
+  `else
     .intr_ext_i         ( '0 ),
-    `endif
+  `endif
     .intr_ext_o         ( ),
     .xeip_ext_o         ( ),
     .mtip_ext_o         ( ),
