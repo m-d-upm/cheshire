@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 //
+// Juan Granja <juan.granja@upm.es>
 // Milos Dordevic <milos.dordevic@upm.es>
 
 #include "regs/cheshire.h"
@@ -353,8 +354,8 @@ void test_conv2d()
     }
     //---------------------------------------//
 
-    //print_uart("CPU Execute: \t");
-    //print_uart("\n\r");
+    print_uart("CPU Execute: \t");
+    print_uart("\n\r");
 
     print_uart("------\n\r");
     examine_mem_hex((uint64_t)(result + IMAGE_SIDE + 1), (uint64_t)(result + IMAGE_SIDE + 1 + 10));

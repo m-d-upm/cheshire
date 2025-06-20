@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0, see LICENSE for details.
 // SPDX-License-Identifier: Apache-2.0
 //
+// Juan Granja <juan.granja@upm.es>
 // Milos Dordevic <milos.dordevic@upm.es>
 
 #pragma once
