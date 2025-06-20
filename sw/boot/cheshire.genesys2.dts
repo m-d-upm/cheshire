@@ -26,24 +26,28 @@
 };
 
 &soc {
-  usb@3008000 {
-    compatible = "generic-ohci";
-    reg = <0x0 0x3008000 0x0 0x1000>;
-    interrupt-parent = <&PLIC0>;
-    interrupts = <19>;
+  /*
+   * usb@3008000 {
+   * compatible = "generic-ohci";
+   * reg = <0x0 0x3008000 0x0 0x1000>;
+   * interrupt-parent = <&PLIC0>;
+   * interrupts = <19>;
+   * };
+  */
+  PLIC0: interrupt-controller@4000000 {
+    riscv,ndev = <60>;
   };
   riscv_iommu: iommu@1001000 {
     compatible = "riscv,iommu";
     reg = <0x0 0x1001000 0x0 0x1000>;
-    // Note that IOMMU IRQs are re-routed by the driver
-    interrupts = <52 53 54>;
+    interrupts = <58 59 60>;
     interrupt-names = "cmdq", "fltq", "hpm";
     interrupt-parent = <&PLIC0>;
-    #iommu-cells = <0>;
+    #iommu-cells = <1>;
   };
   strela@1002000 {
     compatible = "cei,strela";
     reg = <0x0 0x1002000 0x0 0x1000>;
-    iommus = <&riscv_iommu>;
+    iommus = <&riscv_iommu 0>;
   };
 };
