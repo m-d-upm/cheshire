@@ -142,26 +142,29 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     ret.NumExtInIntrs = ret.NumExtInIntrs + 1; // ETHERNET
     ret.AxiExtNumSlv = ret.AxiExtNumSlv + 1; // ETHERNET
     ret.AxiExtNumRules = ret.AxiExtNumRules + 1; // ETHERNET
-    ret.AxiExtRegionIdx = '{0:0};
+    ret.AxiExtRegionIdx[0] = 0;
     // 4K periphs @ AXI	from 0x0100_0000 to 0x0200_0000
     // TO-DO: check if a smaller area can be allocated
     // for memory mapped registers of Ethernet
     // ETHERNET from 0x0100_1000 to 0x0101_1000
-    ret.AxiExtRegionStart = '{0:'h0100_1000}; 
-    ret.AxiExtRegionEnd = '{0:'h0101_1000}; 
+    ret.AxiExtRegionStart[0] = 'h0100_1000; 
+    ret.AxiExtRegionEnd[0] = 'h0101_1000; 
   `endif
   `ifdef USE_IOMMU_AND_CGRA
     ret.NumExtInIntrs = ret.NumExtInIntrs + 4; // IOMMU
     ret.AxiExtNumMst = ret.AxiExtNumMst + 2; // IOMMU x2
     ret.AxiExtNumSlv = ret.AxiExtNumSlv + 2; // IOMMU + STRELA
     ret.AxiExtNumRules = ret.AxiExtNumRules + 2; // IOMMU + STRELA
-    ret.AxiExtRegionIdx = '{1:1, 2:2};
+    ret.AxiExtRegionIdx[1] = 1;
+    ret.AxiExtRegionIdx[2] = 2;
     // 4K periphs @ AXI	from 0x0100_0000 to 0x0200_0000
     // DMA mapped from 0x0100_0000 to 0x0100_1000
     // IOMMU from 0x0101_1000 to 0x0101_2000
     // CGRA from 0x0101_2000 to 0x0101_3000
-    ret.AxiExtRegionStart = '{1:'h0101_1000, 2:'h0101_2000}; 
-    ret.AxiExtRegionEnd = '{1:'h0101_2000, 2:'h0101_3000}; 
+    ret.AxiExtRegionStart[1] = 'h0101_1000; 
+    ret.AxiExtRegionStart[2] = 'h0101_2000; 
+    ret.AxiExtRegionEnd[1] = 'h0101_2000; 
+    ret.AxiExtRegionEnd[2] = 'h0101_3000; 
   `endif
     return ret;
   endfunction
@@ -198,10 +201,10 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     .clk_200      ( clk_200MHz ),
     .clk_125      ( phy_tx_clk ),
     .clk_125_90   ( eth_clk ),
-    .clk_50       ( soc_clk ),
-    .clk_48       ( usb_clk ),
-    .clk_20       ( ),
-    .clk_10       ( )
+    .clk_50       ( soc_clk )//,
+    //.clk_48       ( usb_clk ),
+    //.clk_20       ( ),
+    //.clk_10       ( )
   );
 
   /////////////////////
@@ -587,8 +590,8 @@ axi_slv_rsp_t   [iomsb(FPGACfg.AxiExtNumSlv):0] axi_slv_rsp;
   logic [FPGACfg.AxiDataWidth-1:0] eth_wrdata, eth_rdata;
   logic [FPGACfg.AxiDataWidth/8-1:0] eth_be;
 
-  `AXI_ASSIGN_FROM_REQ(axi_eth_slave[FPGACfg.AxiExtRegionIdx[0]], axi_slv_req[FPGACfg.AxiExtRegionIdx[0]]);
-  `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[0]], axi_eth_slave[FPGACfg.AxiExtRegionIdx[0]]);
+  `AXI_ASSIGN_FROM_REQ(axi_eth_slave, axi_slv_req[FPGACfg.AxiExtRegionIdx[0]]);
+  `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[0]], axi_eth_slave);
 
   eth_axi2mem #(
     .AXI_ID_WIDTH   ( AxiSlvIdWidth ),
