@@ -12,8 +12,6 @@
   `define USE_QSPI
   `define USE_STARTUPE3
   `define USE_VIO
-  `define USE_IOMMU
-  `define USE_CGRA
 `endif
 
 `ifdef TARGET_GENESYS2
@@ -30,8 +28,8 @@
   //`define USE_USB
   `define USE_STARTUPE2
   `define USE_QSPI
-  `define USE_IOMMU
-  `define USE_CGRA
+  `define USE_IOMMU_AND_CGRA
+  `define USE_ETHERNET
 `endif
 
 `ifdef TARGET_ZCU102
