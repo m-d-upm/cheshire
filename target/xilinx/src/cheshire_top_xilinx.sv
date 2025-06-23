@@ -89,6 +89,18 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   `DDR3_INTF
 `endif
 
+`ifdef USE_ETHERNET
+  output wire       eth_rst_n,
+  input  wire       eth_rxck,
+  input  wire       eth_rxctl,
+  input  wire [3:0] eth_rxd,
+  output wire       eth_txck,
+  output wire       eth_txctl,
+  output wire [3:0] eth_txd,
+  inout  wire       eth_mdio,
+  output logic      eth_mdc,
+`endif
+
   output logic  uart_tx_o,
   input  logic  uart_rx_i,
 
@@ -111,18 +123,6 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
 `elsif USE_IOMMU_AND_CGRA
     `define IOMMU_ONLY_IRQS
 `endif 
-
-`ifdef USE_ETHERNET
-  output wire          eth_rst_n,
-  input  wire          eth_rxck,
-  input  wire          eth_rxctl,
-  input  wire [3:0]    eth_rxd,
-  output wire          eth_txck,
-  output wire          eth_txctl,
-  output wire [3:0]    eth_txd,
-  inout  wire          eth_mdio,
-  output logic         eth_mdc,
-`endif
 
   ///////////////////////
   //  Cheshire Config  //
