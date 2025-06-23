@@ -17,7 +17,7 @@ packages:
     - obi_peripherals
     - register_interface
   ariane-ethernet:
-    revision: bb5e375b5417f221f7d5c0ac7ea75fb366e45982
+    revision: b09b1733ca94299bf587714a7e22eef82554142e
     version: null
     source:
       Git: https://github.com/m-d-upm/ariane-ethernet.git
