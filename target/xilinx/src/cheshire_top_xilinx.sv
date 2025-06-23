@@ -96,10 +96,32 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   inout  wire [UsbNumPorts-1:0] usb_dp_io
 );
 
-`ifdef USE_IOMMU
-  `ifdef USE_CGRA
-    `define USE_IOMMU_AND_CGRA
-  `endif
+`ifdef USE_ETHERNET
+  `define ENABLE_EXT_REQS
+`elsif USE_IOMMU_AND_CGRA
+  `define ENABLE_EXT_REQS
+`endif
+
+`ifdef USE_ETHERNET
+  `ifdef USE_IOMMU_AND_CGRA
+    `define COMBINE_IRQS
+  `else
+    `define ETH_ONLY_IRQS
+  `endif 
+`elsif USE_IOMMU_AND_CGRA
+    `define IOMMU_ONLY_IRQS
+`endif 
+
+`ifdef USE_ETHERNET
+  output wire          eth_rst_n,
+  input  wire          eth_rxck,
+  input  wire          eth_rxctl,
+  input  wire [3:0]    eth_rxd,
+  output wire          eth_txck,
+  output wire          eth_txctl,
+  output wire [3:0]    eth_txd,
+  inout  wire          eth_mdio,
+  output logic         eth_mdc,
 `endif
 
   ///////////////////////
@@ -116,18 +138,30 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   `else
     ret.Usb = 0;
   `endif
+  `ifdef USE_ETHERNET
+    ret.NumExtInIntrs = ret.NumExtInIntrs + 1; // ETHERNET
+    ret.AxiExtNumSlv = ret.AxiExtNumSlv + 1; // ETHERNET
+    ret.AxiExtNumRules = ret.AxiExtNumRules + 1; // ETHERNET
+    ret.AxiExtRegionIdx = '{0:0};
+    // 4K periphs @ AXI	from 0x0100_0000 to 0x0200_0000
+    // TO-DO: check if a smaller area can be allocated
+    // for memory mapped registers of Ethernet
+    // ETHERNET from 0x0100_1000 to 0x0101_1000
+    ret.AxiExtRegionStart = '{0:'h0100_1000}; 
+    ret.AxiExtRegionEnd = '{0:'h0101_1000}; 
+  `endif
   `ifdef USE_IOMMU_AND_CGRA
-    ret.NumExtInIntrs = 4; // only IOMMU for now
-    ret.AxiExtNumMst = 2; // IOMMU x2
-    ret.AxiExtNumSlv = 2; // IOMMU + STRELA
-    ret.AxiExtNumRules = 2; // IOMMU + STRELA
-    ret.AxiExtRegionIdx = '{0:0, 1:1, default:0};
+    ret.NumExtInIntrs = ret.NumExtInIntrs + 4; // IOMMU
+    ret.AxiExtNumMst = ret.AxiExtNumMst + 2; // IOMMU x2
+    ret.AxiExtNumSlv = ret.AxiExtNumSlv + 2; // IOMMU + STRELA
+    ret.AxiExtNumRules = ret.AxiExtNumRules + 2; // IOMMU + STRELA
+    ret.AxiExtRegionIdx = '{1:1, 2:2};
     // 4K periphs @ AXI	from 0x0100_0000 to 0x0200_0000
     // DMA mapped from 0x0100_0000 to 0x0100_1000
-    // IOMMU from 0x0100_1000 to 0x0100_2000
-    // CGRA from 0x0100_2000 to 0x0100_3000
-    ret.AxiExtRegionStart = '{0:'h0100_1000, 1:'h0100_2000, default:0}; // IOMMU
-    ret.AxiExtRegionEnd = '{0:'h0100_2000, 1:'h0100_3000, default:0}; // STRELA
+    // IOMMU from 0x0101_1000 to 0x0101_2000
+    // CGRA from 0x0101_2000 to 0x0101_3000
+    ret.AxiExtRegionStart = '{1:'h0101_1000, 2:'h0101_2000}; 
+    ret.AxiExtRegionEnd = '{1:'h0101_2000, 2:'h0101_3000}; 
   `endif
     return ret;
   endfunction
@@ -145,6 +179,9 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   wire sys_clk;
   wire soc_clk;
   wire usb_clk;
+  wire phy_tx_clk;
+  wire eth_clk;
+  wire clk_200MHz;
 
   IBUFDS #(
     .IBUF_LOW_PWR ("FALSE")
@@ -155,13 +192,16 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   );
 
   clkwiz i_clkwiz (
-    .clk_in1  ( sys_clk ),
-    .reset    ( '0 ),
-    .locked   ( ),
-    .clk_50   ( soc_clk ),
-    .clk_48   ( usb_clk ),
-    .clk_20   ( ),
-    .clk_10   ( )
+    .clk_in1      ( sys_clk ),
+    .reset        ( '0 ),
+    .locked       ( ),
+    .clk_200      ( clk_200MHz ),
+    .clk_125      ( phy_tx_clk ),
+    .clk_125_90   ( eth_clk ),
+    .clk_50       ( soc_clk ),
+    .clk_48       ( usb_clk ),
+    .clk_20       ( ),
+    .clk_10       ( )
   );
 
   /////////////////////
@@ -512,45 +552,131 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   );
 `endif
 
-  ///////////////////
-  //     EXT       //
-  ///////////////////
+///////////////////
+//     EXT       //
+///////////////////
 
-  // "workaround" to determine AxiSlvIdWidth parameter
-  localparam axi_in_t local_axi_in = gen_axi_in(FPGACfg);
-  localparam int unsigned AxiSlvIdWidth = FPGACfg.AxiMstIdWidth + $clog2(local_axi_in.num_in);
+// "workaround" to determine AxiSlvIdWidth parameter
+localparam axi_in_t local_axi_in = gen_axi_in(FPGACfg);
+localparam int unsigned AxiSlvIdWidth = FPGACfg.AxiMstIdWidth + $clog2(local_axi_in.num_in);
 
-  // External AXI Master(s)/Slave(s)
-  axi_mst_req_t   [iomsb(FPGACfg.AxiExtNumMst):0] axi_mst_req;
-  axi_mst_rsp_t   [iomsb(FPGACfg.AxiExtNumMst):0] axi_mst_rsp;
+// External AXI Master(s)/Slave(s)
+axi_mst_req_t   [iomsb(FPGACfg.AxiExtNumMst):0] axi_mst_req;
+axi_mst_rsp_t   [iomsb(FPGACfg.AxiExtNumMst):0] axi_mst_rsp;
 
-  axi_slv_req_t   [iomsb(FPGACfg.AxiExtNumSlv):0] axi_slv_req;
-  axi_slv_rsp_t   [iomsb(FPGACfg.AxiExtNumSlv):0] axi_slv_rsp;
+axi_slv_req_t   [iomsb(FPGACfg.AxiExtNumSlv):0] axi_slv_req;
+axi_slv_rsp_t   [iomsb(FPGACfg.AxiExtNumSlv):0] axi_slv_rsp;
+
+`ifdef USE_ETHERNET
   
+  logic eth_irq; // Ethernet interrupt
+
+  AXI_BUS #(
+    .AXI_ADDR_WIDTH( FPGACfg.AddrWidth ),
+    .AXI_DATA_WIDTH( FPGACfg.AxiDataWidth ),
+    .AXI_ID_WIDTH  ( AxiSlvIdWidth ),
+    .AXI_USER_WIDTH( FPGACfg.AxiUserWidth )
+  ) axi_eth_slave();
+
+  ////////////////
+  //  ETHERNET  //
+  ////////////////
+
+  logic eth_en, eth_we, eth_int_n, eth_pme_n, eth_mdio_i, eth_mdio_o, eth_mdio_oe;
+  logic [FPGACfg.AddrWidth-1:0] eth_addr;
+  logic [FPGACfg.AxiDataWidth-1:0] eth_wrdata, eth_rdata;
+  logic [FPGACfg.AxiDataWidth/8-1:0] eth_be;
+
+  `AXI_ASSIGN_FROM_REQ(axi_eth_slave[FPGACfg.AxiExtRegionIdx[0]], axi_slv_req[FPGACfg.AxiExtRegionIdx[0]]);
+  `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[0]], axi_eth_slave[FPGACfg.AxiExtRegionIdx[0]]);
+
+  eth_axi2mem #(
+    .AXI_ID_WIDTH   ( AxiSlvIdWidth ),
+    .AXI_ADDR_WIDTH ( FPGACfg.AddrWidth ),
+    .AXI_DATA_WIDTH ( FPGACfg.AxiDataWidth ),
+    .AXI_USER_WIDTH ( FPGACfg.AxiUserWidth )
+  ) i_axi2rom (
+    .clk_i  ( soc_clk ),
+    .rst_ni ( rst_n ),
+    .slave  ( axi_eth_slave[FPGACfg.AxiExtRegionIdx[0]] ),
+    .req_o  ( eth_en ),
+    .we_o   ( eth_we ),
+    .addr_o ( eth_addr ),
+    .be_o   ( eth_be ),
+    .data_o ( eth_wrdata ),
+    .data_i ( eth_rdata )
+  );
+
+  framing_top eth_rgmii (
+    .msoc_clk         ( soc_clk ),
+    .core_lsu_addr    ( eth_addr[14:0] ),
+    .core_lsu_wdata   ( eth_wrdata ),
+    .core_lsu_be      ( eth_be ),
+    .ce_d             ( eth_en ),
+    .we_d             ( eth_en & eth_we ),
+    .framing_sel      ( eth_en ),
+    .framing_rdata    ( eth_rdata ),
+    .rst_int          ( !rst_n ),
+    // clocks
+    .clk_int          ( phy_tx_clk ),    // 125 MHz 0
+    .clk90_int        ( eth_clk ),    // 125 MHz 90
+    .clk_200_int      ( clk_200MHz ),
+    /*
+     * Ethernet: 1000BASE-T RGMII
+     */
+    .phy_rx_clk       ( eth_rxck ),     
+    .phy_rxd          ( eth_rxd ),       
+    .phy_rx_ctl       ( eth_rxctl ),  
+    .phy_tx_clk       ( eth_txck ),   
+    .phy_txd          ( eth_txd ),       
+    .phy_tx_ctl       ( eth_txctl ),  
+    .phy_reset_n      ( eth_rst_n ), 
+    .phy_int_n        ( eth_int_n ),  // missing 
+    .phy_pme_n        ( eth_pme_n ), // mising
+    .phy_mdc          ( eth_mdc ),       
+    .phy_mdio_i       ( eth_mdio_i ),
+    .phy_mdio_o       ( eth_mdio_o ),
+    .phy_mdio_oe      ( eth_mdio_oe ), 
+    .eth_irq          ( eth_irq )   
+  );
+
+  IOBUF #(
+    .DRIVE( 12 ), // Specify the output drive strength
+    .IBUF_LOW_PWR( "TRUE" ),  // Low Power - "TRUE", High Performance = "FALSE"
+    .IOSTANDARD( "DEFAULT" ), // Specify the I/O standard
+    .SLEW( "SLOW" ) // Specify the output slew rate
+  ) IOBUF_inst (
+    .O( eth_mdio_i ), // Buffer output
+    .IO( eth_mdio ), // Buffer inout port (connect directly to top-level port)
+    .I( eth_mdio_o ), // Buffer input
+    .T( ~eth_mdio_oe ) // 3-state enable input, high=input, low=output
+  );
+
+`endif
+
+`ifdef USE_IOMMU_AND_CGRA
+
   AXI_BUS #(
     .AXI_ADDR_WIDTH ( FPGACfg.AddrWidth        ),
     .AXI_DATA_WIDTH ( FPGACfg.AxiDataWidth     ),
     .AXI_ID_WIDTH   ( AxiSlvIdWidth            ),
     .AXI_USER_WIDTH ( FPGACfg.AxiUserWidth     )
-  ) aux_axi_slaves();
+  ) aux_axi_cgra_slaves();
 
   AXI_BUS #(
       .AXI_ADDR_WIDTH ( FPGACfg.AddrWidth        ),
       .AXI_DATA_WIDTH ( FPGACfg.AxiDataWidth     ),
       .AXI_ID_WIDTH   ( FPGACfg.AxiMstIdWidth    ),
       .AXI_USER_WIDTH ( FPGACfg.AxiUserWidth     )
-  ) aux_axi_masters();
+  ) aux_axi_cgra_masters();
 
   // attach CGRA req/rsp interface to the req/rsp struct signals
-  `AXI_ASSIGN_FROM_REQ(aux_axi_slaves, axi_slv_req[FPGACfg.AxiExtRegionIdx[1]])
-  `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[1]], aux_axi_slaves)
+  `AXI_ASSIGN_FROM_REQ(aux_axi_cgra_slaves, axi_slv_req[FPGACfg.AxiExtRegionIdx[2]])
+  `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[2]], aux_axi_cgra_slaves)
   
   ///////////////////
   //     IOMMU     //
   ///////////////////
-
-
-`ifdef USE_IOMMU
 
   logic [3:0] iommu_int; // for interrupts
 
@@ -558,8 +684,8 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   axi_iommu_rsp_t axi_iommu_rsp;
 
   // from the AXI Master interface of the STRELA CGRA to the struct going into IOMMU slave port
-  `AXI_ASSIGN_TO_REQ(axi_iommu_req, aux_axi_masters)
-  `AXI_ASSIGN_FROM_RESP(aux_axi_masters, axi_iommu_rsp)
+  `AXI_ASSIGN_TO_REQ(axi_iommu_req, aux_axi_cgra_masters)
+  `AXI_ASSIGN_FROM_RESP(aux_axi_cgra_masters, axi_iommu_rsp)
 
   // AW
   //assign axi_iommu_req.aw.stream_id = '1;
@@ -608,24 +734,20 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     .dev_tr_req_i		  ( axi_iommu_req ),
     .dev_tr_resp_o	  ( axi_iommu_rsp ),
     // Translation Completion Interface (Master)
-    .dev_comp_resp_i  ( axi_mst_rsp[FPGACfg.AxiExtRegionIdx[1]] ),
-    .dev_comp_req_o   ( axi_mst_req[FPGACfg.AxiExtRegionIdx[1]] ),
+    .dev_comp_resp_i  ( axi_mst_rsp[FPGACfg.AxiExtRegionIdx[2]] ),
+    .dev_comp_req_o   ( axi_mst_req[FPGACfg.AxiExtRegionIdx[2]] ),
     // Implicit Memory Accesses Interface (Master)
-    .ds_resp_i			  ( axi_mst_rsp[FPGACfg.AxiExtRegionIdx[0]] ),
-    .ds_req_o			    ( axi_mst_req[FPGACfg.AxiExtRegionIdx[0]] ),
+    .ds_resp_i			  ( axi_mst_rsp[FPGACfg.AxiExtRegionIdx[1]] ),
+    .ds_req_o			    ( axi_mst_req[FPGACfg.AxiExtRegionIdx[1]] ),
     // Programming Interface (Slave) (AXI4 Full -> AXI4-Lite -> Reg IF)
-    .prog_req_i			  ( axi_slv_req[FPGACfg.AxiExtRegionIdx[0]] ),
-    .prog_resp_o		  ( axi_slv_rsp[FPGACfg.AxiExtRegionIdx[0]] ),
+    .prog_req_i			  ( axi_slv_req[FPGACfg.AxiExtRegionIdx[1]] ),
+    .prog_resp_o		  ( axi_slv_rsp[FPGACfg.AxiExtRegionIdx[1]] ),
     .wsi_wires_o 		  ( iommu_int )
   );
-
-`endif
 
   ///////////////////
   //     CGRA      //
   ///////////////////
-
-`ifdef USE_CGRA
 
   axi_cgra_top #(
     .AXI_ID_WIDTH_MASTER   ( FPGACfg.AxiMstIdWidth ),
@@ -636,8 +758,8 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   ) i_axi_cgra_top (
     .clk_i                 ( soc_clk      ), // clk
     .rst_ni                ( rst_n     ), // ndmreset_n 
-    .axi_slave_port        ( aux_axi_slaves ),
-    .axi_master_port       ( aux_axi_masters )
+    .axi_slave_port        ( aux_axi_cgra_slaves ),
+    .axi_master_port       ( aux_axi_cgra_masters )
   );
 
 `endif
@@ -665,7 +787,7 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     .rtc_i              ( rtc_clk_q       ),
     .axi_llc_mst_req_o  ( axi_llc_mst_req ),
     .axi_llc_mst_rsp_i  ( axi_llc_mst_rsp ),
-  `ifdef USE_IOMMU_AND_CGRA
+  `ifdef ENABLE_EXT_REQS
     .axi_ext_mst_req_i  ( axi_mst_req ),
     .axi_ext_mst_rsp_o  ( axi_mst_rsp ),
     .axi_ext_slv_req_o  ( axi_slv_req ),
@@ -678,12 +800,16 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   `endif
     .reg_ext_slv_req_o  ( ),
     .reg_ext_slv_rsp_i  ( '0 ),
-  `ifdef USE_IOMMU_AND_CGRA
+  `ifdef COMBINE_IRQS
+    .intr_ext_i         ( { eth_irq, iommu_int } ),
+  `elsif IOMMU_ONLY_IRQS
     .intr_ext_i         ( iommu_int ),
+  `elsif ETH_ONLY_IRQS
+    .intr_ext_i         ( eth_int ),
   `else
     .intr_ext_i         ( '0 ),
   `endif
-    .intr_ext_o         ( ),
+    .intr_ext_o         ( ),  
     .xeip_ext_o         ( ),
     .mtip_ext_o         ( ),
     .msip_ext_o         ( ),
