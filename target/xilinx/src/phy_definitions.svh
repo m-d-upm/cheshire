@@ -12,6 +12,8 @@
   `define USE_QSPI
   `define USE_STARTUPE3
   `define USE_VIO
+  `define USE_IOMMU_AND_CGRA
+  //`define USE_ETHERNET
 `endif
 
 `ifdef TARGET_GENESYS2
@@ -23,7 +25,7 @@
   `define USE_DDR3
   `define USE_FAN
   `define USE_VIO
-  `define USE_I2C
+  //`define USE_I2C
   //`define USE_VGA
   //`define USE_USB
   `define USE_STARTUPE2
