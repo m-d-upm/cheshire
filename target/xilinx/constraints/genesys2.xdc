@@ -19,6 +19,11 @@ create_clock -period $SYS_TCK -name sys_clk [get_ports sys_clk_p]
 set SOC_TCK 20.0
 set soc_clk [get_clocks -of_objects [get_pins i_clkwiz/clk_50]]
 
+#set_property CLOCK_REGION X0Y3 [get_cells i_dram_wrapper/i_dram/u_mig7s_mig/temp_mon_enabled.u_tempmon/xadc_supplied_temperature.rst_r2_reg]
+
+set_property LOC MMCME2_ADV_X0Y1 [get_cells -hier -filter {NAME =~ */u_ddr3_infrastructure/gen_mmcm.mmcm_i}]
+#set_property LOC PLLE2_ADV_X0Y0 [get_cells -hier -filter {NAME =~ */u_ddr3_infrastructure/plle2_i}]
+
 ############
 # Switches #
 ############
@@ -235,7 +240,7 @@ set_property -dict {PACKAGE_PIN AG12 IOSTANDARD LVCMOS15} [get_ports { eth_mdio 
 
 # Modified for 125MHz receive clock
 create_clock -period 8.000 -name eth_rxck [get_ports eth_rxck]
-set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets eth_rxck_IBUF] 
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets eth_rxck] 
 
 set_clock_groups -asynchronous -group [get_clocks eth_rxck -include_generated_clocks]
 set_clock_groups -asynchronous -group [get_clocks -of_objects [get_pins i_clkwiz/clk_125]]

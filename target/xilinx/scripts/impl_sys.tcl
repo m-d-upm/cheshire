@@ -48,12 +48,19 @@ gen_reports ${project_root}/reports.synth
 insert_ilas {soc_clk}
 
 # Set implementation properties
-set_property strategy Performance_ExtraTimingOpt [get_runs impl_1]
+#set_property strategy Performance_ExtraTimingOpt [get_runs impl_1]
+set_property strategy Performance_ExplorePostRoutePhysOpt [get_runs impl_1]
 
 # Implementation
 launch_runs -jobs $num_jobs impl_1 -to_step write_bitstream
 wait_on_run impl_1
 open_run impl_1
+
+# Run physical optimization for aggressive hold fixing
+phys_opt_design -aggressive_hold_fix
+
+# Write the bitstream again after hold fix (overwrite)
+write_bitstream -force ${project_root}/${proj}.runs/impl_1/cheshire_top_xilinx.bit
 
 # Generate implementation reports
 gen_reports ${project_root}/reports.impl
