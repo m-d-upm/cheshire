@@ -128,6 +128,34 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   //  Cheshire Config  //
   ///////////////////////
 
+`ifdef USE_ETHERNET
+  `ifdef USE_IOMMU_AND_CGRA
+    // IOMMU + ETHERNET
+    localparam int EXT_INT = 5; // IOMMU - 4, ETHERNET - 1
+    localparam int EXT_NUM_RULES = 3; // IOMMU - 1, STRELA - 1, ETHERNET - 1
+    localparam int EXT_NUM_SLV = 3; // IOMMU - 1, STRELA - 1, ETHERNET - 1
+    localparam int EXT_NUM_MST = 2; // IOMMU - 1, STRELA - 1
+  `else
+    // ETHERNET
+    localparam int EXT_INT = 1;
+    localparam int EXT_NUM_RULES = 1;
+    localparam int EXT_NUM_SLV = 1;
+    localparam int EXT_NUM_MST = 0; 
+  `endif 
+`elsif USE_IOMMU_AND_CGRA
+  // IOMMU
+  localparam int EXT_INT = 4; 
+  localparam int EXT_NUM_RULES = 2;
+  localparam int EXT_NUM_SLV = 2;
+  localparam int EXT_NUM_MST = 2; 
+`else
+  // NONE
+  localparam int EXT_INT = 0;
+  localparam int EXT_NUM_RULES = 0; 
+  localparam int EXT_NUM_SLV = 0;
+  localparam int EXT_NUM_MST = 0;
+`endif 
+
   // Use default config as far as possible
   function automatic cheshire_cfg_t gen_cheshire_xilinx_cfg();
     cheshire_cfg_t ret  = DefaultCfg;
@@ -138,10 +166,11 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   `else
     ret.Usb = 0;
   `endif
+    ret.NumExtInIntrs = EXT_INT;
+    ret.AxiExtNumRules = EXT_NUM_RULES;
+    ret.AxiExtNumMst = EXT_NUM_MST; 
+    ret.AxiExtNumSlv = EXT_NUM_SLV; 
   `ifdef USE_ETHERNET
-    ret.NumExtInIntrs = ret.NumExtInIntrs + 1; // ETHERNET
-    ret.AxiExtNumSlv = ret.AxiExtNumSlv + 1; // ETHERNET
-    ret.AxiExtNumRules = ret.AxiExtNumRules + 1; // ETHERNET
     ret.AxiExtRegionIdx[0] = 0;
     // 4K periphs @ AXI	from 0x0100_0000 to 0x0200_0000
     // TO-DO: check if a smaller area can be allocated
@@ -151,10 +180,6 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     ret.AxiExtRegionEnd[0] = 'h0101_1000; 
   `endif
   `ifdef USE_IOMMU_AND_CGRA
-    ret.NumExtInIntrs = ret.NumExtInIntrs + 4; // IOMMU
-    ret.AxiExtNumMst = ret.AxiExtNumMst + 2; // IOMMU x2
-    ret.AxiExtNumSlv = ret.AxiExtNumSlv + 2; // IOMMU + STRELA
-    ret.AxiExtNumRules = ret.AxiExtNumRules + 2; // IOMMU + STRELA
     ret.AxiExtRegionIdx[1] = 1;
     ret.AxiExtRegionIdx[2] = 2;
     // 4K periphs @ AXI	from 0x0100_0000 to 0x0200_0000
