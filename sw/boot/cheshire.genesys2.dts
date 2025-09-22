@@ -50,4 +50,9 @@
     reg = <0x0 0x1002000 0x0 0x1000>;
     iommus = <&riscv_iommu 0>;
   };
+  strela@1003000 {
+    compatible = "cei,strela";
+    reg = <0x0 0x1003000 0x0 0x1000>;
+    iommus = <&riscv_iommu 1>;
+  };
 };
