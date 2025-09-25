@@ -559,28 +559,6 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
       .AXI_USER_WIDTH ( FPGACfg.AxiUserWidth     )
   ) arb_slv();
 
-  `AXI_ASSIGN_TO_REQ(arb_axi_iommu_req, arb_slv)
-  `AXI_ASSIGN_FROM_RESP(arb_slv, arb_axi_iommu_rsp)
-
-  /*
-  dma_arb_intf #(
-    .AxiIdWidth   (AxiSlvIdWidth),
-    .aw_chan_t    (axi_mst_aw_chan_t),
-    .w_chan_t     (axi_mst_w_chan_t),
-    .b_chan_t     (axi_mst_b_chan_t),
-    .ar_chan_t    (axi_mst_ar_chan_t),
-    .r_chan_t     (axi_mst_r_chan_t),
-    .axi_req_t    (axi_mst_req_t),
-    .axi_rsp_t    (axi_mst_rsp_t),
-    .NrDMAs       (2)
-  ) iommu_cgra_dma_arbiter (
-    .clk_i        (soc_clk),
-    .rst_ni       (rst_n),
-    .slv_ports    (aux_axi_masters),
-    .mst_port     (arb_slv)
-  );
-  */
-
   // AXI Multiplexer: This module multiplexes the AXI4 slave ports down to one master port.
   // The AXI IDs from the slave ports get extended with the respective slave port index.
   // The extension width can be calculated with `$clog2(NoSlvPorts)`. This means the AXI
@@ -590,7 +568,7 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   // a response with ID `6'b100110` will be forwarded to slave port 2 (`2'b10`).
   axi_mux_intf #(
     .SLV_AXI_ID_WIDTH (FPGACfg.AxiMstIdWidth), 
-    .MST_AXI_ID_WIDTH (AxiSlvIdWidth), // extended by 1 because log2(NO_SLV_PORTS) where NO_SLV_PORTS == 2 is 1
+    .MST_AXI_ID_WIDTH (AxiSlvIdWidth), 
     .AXI_ADDR_WIDTH   (FPGACfg.AddrWidth),
     .AXI_DATA_WIDTH   (FPGACfg.AxiDataWidth),
     .AXI_USER_WIDTH   (FPGACfg.AxiUserWidth),
@@ -610,6 +588,44 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     .mst              (arb_slv)          // master port
   );
 
+  AXI_BUS #(
+      .AXI_ADDR_WIDTH ( FPGACfg.AddrWidth        ),
+      .AXI_DATA_WIDTH ( FPGACfg.AxiDataWidth     ),
+      .AXI_ID_WIDTH   ( FPGACfg.AxiMstIdWidth    ),
+      .AXI_USER_WIDTH ( FPGACfg.AxiUserWidth     )
+  ) remapper_mst();
+
+  /// Remap AXI IDs from wide IDs at the slave port to narrower IDs at the master port.
+  ///
+  /// This module is designed to remap an overly wide, sparsely used ID space to a narrower, densely
+  /// used ID space.  This scenario occurs, for example, when an AXI master has wide ID ports but
+  /// effectively only uses a (not necessarily contiguous) subset of IDs.
+  ///
+  /// This module retains the independence of IDs.  That is, if two transactions have different IDs at
+  /// the slave port of this module, they are guaranteed to have different IDs at the master port of
+  /// this module.  This implies a lower bound on the [width of IDs on the master
+  /// port](#parameter.AxiMstPortIdWidth).  If you require narrower master port IDs and can forgo ID
+  /// independence, use [`axi_id_serialize`](module.axi_id_serialize) instead.
+  ///
+  /// Internally, a [table is used for remapping IDs](module.axi_id_remap_table).
+  axi_id_remap_intf #(
+    .AXI_SLV_PORT_ID_WIDTH (AxiSlvIdWidth),
+    .AXI_SLV_PORT_MAX_UNIQ_IDS (2**FPGACfg.AxiMstIdWidth),
+    .AXI_MAX_TXNS_PER_ID (FPGACfg.AxiMaxSlvTrans),
+    .AXI_MST_PORT_ID_WIDTH (FPGACfg.AxiMstIdWidth),
+    .AXI_ADDR_WIDTH (FPGACfg.AddrWidth),
+    .AXI_DATA_WIDTH (FPGACfg.AxiDataWidth),
+    .AXI_USER_WIDTH (FPGACfg.AxiUserWidth)
+  ) iommu_cgra_dma_arbiter_mux_id_remapper ( // remap extended ID width from axi_mux to the narrower (original) one
+    .clk_i (soc_clk),
+    .rst_ni (rst_n),
+    .slv (arb_slv),
+    .mst (remapper_mst)
+  );
+
+  `AXI_ASSIGN_TO_REQ(arb_axi_iommu_req, remapper_mst)
+  `AXI_ASSIGN_FROM_RESP(remapper_mst, arb_axi_iommu_rsp)
+
   ///////////////////
   //     IOMMU     //
   ///////////////////
@@ -618,36 +634,14 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
 
   logic [3:0] iommu_int; // for interrupts
 
-  //axi_iommu_req_t axi_iommu_req;
-  //axi_iommu_rsp_t axi_iommu_rsp;
-
-  // commented out because of the arbiter
-  // from the AXI Master interface of the STRELA CGRA to the struct going into IOMMU slave port
-  //`AXI_ASSIGN_TO_REQ(axi_iommu_req, aux_axi_masters)
-  //`AXI_ASSIGN_FROM_RESP(aux_axi_masters, axi_iommu_rsp)
-
   // AW
-  //assign axi_iommu_req.aw.stream_id = '1;
-  //assign axi_iommu_req.aw.stream_id = '0;
-  //assign axi_iommu_req.aw.ss_id_valid = '0;
-  //assign axi_iommu_req.aw.ss_id_valid = '1;
-  //assign axi_iommu_req.aw.substream_id = '0;
-  
-  // AR
-  //assign axi_iommu_req.ar.stream_id = '1;
-  //assign axi_iommu_req.ar.stream_id = '0;
-  //assign axi_iommu_req.ar.ss_id_valid = '0;
-  //assign axi_iommu_req.ar.ss_id_valid = '1;
-  //assign axi_iommu_req.ar.substream_id = '0;
-  
-  // AW
-  assign arb_axi_iommu_req.aw.stream_id = '0;
-  assign arb_axi_iommu_req.aw.ss_id_valid = '1;
+  assign arb_axi_iommu_req.aw.stream_id = { 23'b00000000000000000000000, arb_slv.aw_id[FPGACfg.AxiMstIdWidth+:1] };
+  assign arb_axi_iommu_req.aw.ss_id_valid = '0;
   assign arb_axi_iommu_req.aw.substream_id = '0;
 
   // AR
-  assign arb_axi_iommu_req.ar.stream_id = '0;
-  assign arb_axi_iommu_req.ar.ss_id_valid = '1;
+  assign arb_axi_iommu_req.ar.stream_id = { 23'b00000000000000000000000, arb_slv.ar_id[FPGACfg.AxiMstIdWidth+:1] };
+  assign arb_axi_iommu_req.ar.ss_id_valid = '0;
   assign arb_axi_iommu_req.ar.substream_id = '0;
 
   riscv_iommu #(
