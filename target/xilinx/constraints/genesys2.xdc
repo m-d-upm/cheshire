@@ -19,6 +19,8 @@ create_clock -period $SYS_TCK -name sys_clk [get_ports sys_clk_p]
 set SOC_TCK 20.0
 set soc_clk [get_clocks -of_objects [get_pins i_clkwiz/clk_50]]
 
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets sys_clk]
+
 ############
 # Switches #
 ############
