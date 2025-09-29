@@ -9,10 +9,12 @@
 
 #include <stdint.h>
 
-#define CGRA_CTRL_BIT_START_EXEC    0x1
-#define CGRA_CTRL_BIT_CLEAR_STATE   0x2
-#define CGRA_CTRL_BIT_LOAD_CONFIG   0x4
-#define CGRA_CTRL_BIT_CLEAR_CONFIG  0x8
+#define CGRA_CTRL_BIT_START_EXEC            0x1
+#define CGRA_CTRL_BIT_CLEAR_STATE           0x2
+#define CGRA_CTRL_BIT_LOAD_CONFIG           0x4
+#define CGRA_CTRL_BIT_CLEAR_CONFIG          0x8
+#define STRELA_CTRL_BIT_CLEAR_INT_CONFIG    0x10
+#define STRELA_CTRL_BIT_CLEAR_INT_EXEC	    0x20
 
 #define CGRA_CTRL_BIT_DONE_CONFIG   0x2
 #define CGRA_CTRL_BIT_DONE_EXEC     0x1
