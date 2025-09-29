@@ -117,7 +117,7 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     ret.Usb = 0;
   `endif
   `ifdef USE_IOMMU_AND_CGRA
-    ret.NumExtInIntrs = 4; // only IOMMU for now
+    ret.NumExtInIntrs = 8; // IOMMU + STRELA x2
     ret.AxiExtNumMst = 2; // IOMMU x2
     ret.AxiExtNumSlv = 3; // IOMMU + STRELA x2
     ret.AxiExtNumRules = 3; // IOMMU + STRELA x2
@@ -696,6 +696,9 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
 
 `ifdef USE_CGRA
 
+  logic [1:0] cgra0_int;
+  logic [1:0] cgra1_int;
+
   axi_cgra_top #(
     .AXI_ID_WIDTH_MASTER   ( FPGACfg.AxiMstIdWidth ),
     .AXI_ID_WIDTH_SLAVE    ( AxiSlvIdWidth ),
@@ -706,7 +709,8 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     .clk_i                 ( soc_clk      ), // clk
     .rst_ni                ( rst_n     ), // ndmreset_n 
     .axi_slave_port        ( aux_axi_slaves[0] ),
-    .axi_master_port       ( aux_axi_masters[0] )
+    .axi_master_port       ( aux_axi_masters[0] ),
+    .int_lines              ( cgra0_int )
   );
 
   axi_cgra_top #(
@@ -719,7 +723,8 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     .clk_i                 ( soc_clk      ), // clk
     .rst_ni                ( rst_n     ), // ndmreset_n 
     .axi_slave_port        ( aux_axi_slaves[1] ),
-    .axi_master_port       ( aux_axi_masters[1] )
+    .axi_master_port       ( aux_axi_masters[1] ),
+    .int_lines             ( cgra1_int )
   );
 
 `endif
@@ -761,7 +766,7 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     .reg_ext_slv_req_o  ( ),
     .reg_ext_slv_rsp_i  ( '0 ),
   `ifdef USE_IOMMU_AND_CGRA
-    .intr_ext_i         ( iommu_int ),
+    .intr_ext_i         ( { cgra1_int, cgra0_int, iommu_int } ),
   `else
     .intr_ext_i         ( '0 ),
   `endif
