@@ -116,6 +116,11 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   `else
     ret.Usb = 0;
   `endif
+  `ifdef USE_VGA
+    ret.Vga = 1;
+  `else
+    ret.Vga = 0;
+  `endif
   `ifdef USE_IOMMU_AND_CGRA
     ret.NumExtInIntrs = 8; // IOMMU + STRELA x2
     ret.AxiExtNumMst = 2; // IOMMU x2
@@ -710,7 +715,7 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     .rst_ni                ( rst_n     ), // ndmreset_n 
     .axi_slave_port        ( aux_axi_slaves[0] ),
     .axi_master_port       ( aux_axi_masters[0] ),
-    .int_lines              ( cgra0_int )
+    .int_lines             ( cgra0_int )
   );
 
   axi_cgra_top #(
