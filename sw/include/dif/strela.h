@@ -16,8 +16,10 @@
 #define STRELA_CTRL_BIT_CLEAR_INT_CONFIG    0x10
 #define STRELA_CTRL_BIT_CLEAR_INT_EXEC	    0x20
 
-#define CGRA_CTRL_BIT_DONE_CONFIG   0x2
-#define CGRA_CTRL_BIT_DONE_EXEC     0x1
+#define CGRA_CTRL_BIT_DONE_CONFIG           0x2
+#define CGRA_CTRL_BIT_DONE_EXEC             0x1
+#define CGRA_CTRL_BIT_PENDING_INT_CONFIG	0x4
+#define CGRA_CTRL_BIT_PENDING_INT_EXEC	    0x8
 
 #define CGRA_IN_BITS_STRIDE_COUNT(stride, count) ( (stride << 16) | stride * count )
 #define CGRA_OUT_BITS_STRIDE4_COUNT(count) ( 4 * count )
