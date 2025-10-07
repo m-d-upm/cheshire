@@ -30,7 +30,8 @@ update_compile_order -fileset sources_1
 # TODO: investigate resource-affordable retiming
 set_property XPM_LIBRARIES XPM_MEMORY [current_project]
 #set_property strategy Flow_PerfOptimized_high [get_runs synth_1]
-set_property strategy Flow_PerfThresholdCarry [get_runs synth_1]
+#set_property strategy Flow_PerfThresholdCarry [get_runs synth_1]
+set_property strategy Flow_AreaMultThresholdDSP [get_runs synth_1]
 
 # Elaborate and open design to explore all clocks
 synth_design -rtl -name rtl_1
