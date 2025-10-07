@@ -126,7 +126,7 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     ret.AxiExtNumMst = 4; // IOMMU x2
     ret.AxiExtNumSlv = 4; // IOMMU x2 + STRELA x2
     ret.AxiExtNumRules = 4; // IOMMU x2 + STRELA x2
-    ret.AxiExtRegionIdx = '{0:0, 1:1, 2:2, 3:3 default:0};
+    ret.AxiExtRegionIdx = '{0:0, 1:1, 2:2, 3:3, default:0};
     // 4K periphs @ AXI	from 0x0100_0000 to 0x0200_0000
     // DMA mapped from 0x0100_0000 to 0x0100_1000
     // IOMMU_0 from 0x0100_1000 to 0x0100_2000
