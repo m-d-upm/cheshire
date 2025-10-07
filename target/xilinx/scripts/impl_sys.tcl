@@ -29,7 +29,8 @@ update_compile_order -fileset sources_1
 # Set synthesis properties
 # TODO: investigate resource-affordable retiming
 set_property XPM_LIBRARIES XPM_MEMORY [current_project]
-set_property strategy Flow_PerfOptimized_high [get_runs synth_1]
+#set_property strategy Flow_PerfOptimized_high [get_runs synth_1]
+set_property strategy Flow_PerfThresholdCarry [get_runs synth_1]
 
 # Elaborate and open design to explore all clocks
 synth_design -rtl -name rtl_1
@@ -48,7 +49,9 @@ gen_reports ${project_root}/reports.synth
 insert_ilas {soc_clk}
 
 # Set implementation properties
-set_property strategy Performance_ExtraTimingOpt [get_runs impl_1]
+#set_property strategy Performance_ExtraTimingOpt [get_runs impl_1]
+#set_property strategy Performance_NetDelay_low [get_runs impl_1]
+set_property strategy Flow_RunPostRoutePhysOpt [get_runs impl_1]
 
 # Implementation
 launch_runs -jobs $num_jobs impl_1 -to_step write_bitstream
