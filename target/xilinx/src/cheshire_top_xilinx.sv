@@ -122,18 +122,19 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     ret.Vga = 0;
   `endif
   `ifdef USE_IOMMU_AND_CGRA
-    ret.NumExtInIntrs = 8; // IOMMU + STRELA x2
-    ret.AxiExtNumMst = 2; // IOMMU x2
-    ret.AxiExtNumSlv = 3; // IOMMU + STRELA x2
-    ret.AxiExtNumRules = 3; // IOMMU + STRELA x2
-    ret.AxiExtRegionIdx = '{0:0, 1:1, 2:2, default:0};
+    ret.NumExtInIntrs = 12; // IOMMU x2 + STRELA x2
+    ret.AxiExtNumMst = 4; // IOMMU x2
+    ret.AxiExtNumSlv = 4; // IOMMU x2 + STRELA x2
+    ret.AxiExtNumRules = 4; // IOMMU x2 + STRELA x2
+    ret.AxiExtRegionIdx = '{0:0, 1:1, 2:2, 3:3 default:0};
     // 4K periphs @ AXI	from 0x0100_0000 to 0x0200_0000
     // DMA mapped from 0x0100_0000 to 0x0100_1000
-    // IOMMU from 0x0100_1000 to 0x0100_2000
-    // CGRA_0 from 0x0100_2000 to 0x0100_3000
-    // CGRA_1 from 0x0100_3000 to 0x0100_4000
-    ret.AxiExtRegionStart = '{0:'h0100_1000, 1:'h0100_2000, 2:'h0100_3000, default:0}; 
-    ret.AxiExtRegionEnd = '{0:'h0100_2000, 1:'h0100_3000, 2:'h0100_4000, default:0}; 
+    // IOMMU_0 from 0x0100_1000 to 0x0100_2000
+    // IOMMU_1 from 0x0100_2000 to 0x0100_3000
+    // CGRA_0 from 0x0100_3000 to 0x0100_4000
+    // CGRA_1 from 0x0100_4000 to 0x0100_5000
+    ret.AxiExtRegionStart = '{0:'h0100_1000, 1:'h0100_2000, 2:'h0100_3000, 3:'h0100_4000 , default:0}; 
+    ret.AxiExtRegionEnd = '{0:'h0100_2000, 1:'h0100_3000, 2:'h0100_4000, 3:'h0100_5000 , default:0}; 
   `endif
     return ret;
   endfunction
@@ -548,106 +549,52 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   ) aux_axi_masters[1:0]();
 
   // attach CGRA req/rsp interface to the req/rsp struct signals
-  `AXI_ASSIGN_FROM_REQ(aux_axi_slaves[0], axi_slv_req[FPGACfg.AxiExtRegionIdx[1]])
-  `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[1]], aux_axi_slaves[0])
+  `AXI_ASSIGN_FROM_REQ(aux_axi_slaves[0], axi_slv_req[FPGACfg.AxiExtRegionIdx[2]])
+  `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[2]], aux_axi_slaves[0])
 
-  `AXI_ASSIGN_FROM_REQ(aux_axi_slaves[1], axi_slv_req[FPGACfg.AxiExtRegionIdx[2]])
-  `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[2]], aux_axi_slaves[1])
+  `AXI_ASSIGN_FROM_REQ(aux_axi_slaves[1], axi_slv_req[FPGACfg.AxiExtRegionIdx[3]])
+  `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[3]], aux_axi_slaves[1])
 
-  axi_iommu_req_t arb_axi_iommu_req;
-  axi_iommu_rsp_t arb_axi_iommu_rsp;
+  axi_iommu_req_t arb_axi_iommu0_req;
+  axi_iommu_rsp_t arb_axi_iommu0_rsp;
 
-  AXI_BUS #(
-      .AXI_ADDR_WIDTH ( FPGACfg.AddrWidth        ),
-      .AXI_DATA_WIDTH ( FPGACfg.AxiDataWidth     ),
-      .AXI_ID_WIDTH   ( AxiSlvIdWidth    ),
-      .AXI_USER_WIDTH ( FPGACfg.AxiUserWidth     )
-  ) arb_slv();
+  `AXI_ASSIGN_TO_REQ(arb_axi_iommu0_req, aux_axi_masters[0]);
+  `AXI_ASSIGN_FROM_RESP(aux_axi_masters[0], arb_axi_iommu0_rsp);
 
-  // AXI Multiplexer: This module multiplexes the AXI4 slave ports down to one master port.
-  // The AXI IDs from the slave ports get extended with the respective slave port index.
-  // The extension width can be calculated with `$clog2(NoSlvPorts)`. This means the AXI
-  // ID for the master port has to be this `$clog2(NoSlvPorts)` wider than the ID for the
-  // slave ports.
-  // Responses are switched based on these bits. For example, with 4 slave ports
-  // a response with ID `6'b100110` will be forwarded to slave port 2 (`2'b10`).
-  axi_mux_intf #(
-    .SLV_AXI_ID_WIDTH (FPGACfg.AxiMstIdWidth), 
-    .MST_AXI_ID_WIDTH (AxiSlvIdWidth), 
-    .AXI_ADDR_WIDTH   (FPGACfg.AddrWidth),
-    .AXI_DATA_WIDTH   (FPGACfg.AxiDataWidth),
-    .AXI_USER_WIDTH   (FPGACfg.AxiUserWidth),
-    .NO_SLV_PORTS     (2), // Number of slave ports
-    // Maximum number of outstanding transactions per write
-    .MAX_W_TRANS      (FPGACfg.AxiMaxSlvTrans),
-    .SPILL_AW         (1),
-    .SPILL_W          (1),
-    .SPILL_B          (1),
-    .SPILL_AR         (1),
-    .SPILL_R          (1)
-  ) iommu_cgra_dma_arbiter_mux (
-    .clk_i            (soc_clk),         // Clock
-    .rst_ni           (rst_n),           // Asynchronous reset active low
-    .test_i           (test_mode_i),     // Testmode enable
-    .slv              (aux_axi_masters), // slave ports
-    .mst              (arb_slv)          // master port
-  );
+  axi_iommu_req_t arb_axi_iommu1_req;
+  axi_iommu_rsp_t arb_axi_iommu1_rsp;
 
-  AXI_BUS #(
-      .AXI_ADDR_WIDTH ( FPGACfg.AddrWidth        ),
-      .AXI_DATA_WIDTH ( FPGACfg.AxiDataWidth     ),
-      .AXI_ID_WIDTH   ( FPGACfg.AxiMstIdWidth    ),
-      .AXI_USER_WIDTH ( FPGACfg.AxiUserWidth     )
-  ) remapper_mst();
-
-  /// Remap AXI IDs from wide IDs at the slave port to narrower IDs at the master port.
-  ///
-  /// This module is designed to remap an overly wide, sparsely used ID space to a narrower, densely
-  /// used ID space.  This scenario occurs, for example, when an AXI master has wide ID ports but
-  /// effectively only uses a (not necessarily contiguous) subset of IDs.
-  ///
-  /// This module retains the independence of IDs.  That is, if two transactions have different IDs at
-  /// the slave port of this module, they are guaranteed to have different IDs at the master port of
-  /// this module.  This implies a lower bound on the [width of IDs on the master
-  /// port](#parameter.AxiMstPortIdWidth).  If you require narrower master port IDs and can forgo ID
-  /// independence, use [`axi_id_serialize`](module.axi_id_serialize) instead.
-  ///
-  /// Internally, a [table is used for remapping IDs](module.axi_id_remap_table).
-  axi_id_remap_intf #(
-    .AXI_SLV_PORT_ID_WIDTH (AxiSlvIdWidth),
-    .AXI_SLV_PORT_MAX_UNIQ_IDS (2**FPGACfg.AxiMstIdWidth),
-    .AXI_MAX_TXNS_PER_ID (FPGACfg.AxiMaxSlvTrans),
-    .AXI_MST_PORT_ID_WIDTH (FPGACfg.AxiMstIdWidth),
-    .AXI_ADDR_WIDTH (FPGACfg.AddrWidth),
-    .AXI_DATA_WIDTH (FPGACfg.AxiDataWidth),
-    .AXI_USER_WIDTH (FPGACfg.AxiUserWidth)
-  ) iommu_cgra_dma_arbiter_mux_id_remapper ( // remap extended ID width from axi_mux to the narrower (original) one
-    .clk_i (soc_clk),
-    .rst_ni (rst_n),
-    .slv (arb_slv),
-    .mst (remapper_mst)
-  );
-
-  `AXI_ASSIGN_TO_REQ(arb_axi_iommu_req, remapper_mst)
-  `AXI_ASSIGN_FROM_RESP(remapper_mst, arb_axi_iommu_rsp)
-
+  `AXI_ASSIGN_TO_REQ(arb_axi_iommu1_req, aux_axi_masters[1]);
+  `AXI_ASSIGN_FROM_RESP(aux_axi_masters[1], arb_axi_iommu1_rsp);
+  
   ///////////////////
   //     IOMMU     //
   ///////////////////
 
 `ifdef USE_IOMMU
 
-  logic [3:0] iommu_int; // for interrupts
+  logic [3:0] iommu0_int;
+  logic [3:0] iommu1_int;
 
   // AW
-  assign arb_axi_iommu_req.aw.stream_id = { 23'b00000000000000000000000, arb_slv.aw_id[FPGACfg.AxiMstIdWidth+:1] };
-  assign arb_axi_iommu_req.aw.ss_id_valid = '0;
-  assign arb_axi_iommu_req.aw.substream_id = '0;
+  assign arb_axi_iommu0_req.aw.stream_id = '0;
+  assign arb_axi_iommu0_req.aw.ss_id_valid = '0;
+  assign arb_axi_iommu0_req.aw.substream_id = '0;
 
   // AR
-  assign arb_axi_iommu_req.ar.stream_id = { 23'b00000000000000000000000, arb_slv.ar_id[FPGACfg.AxiMstIdWidth+:1] };
-  assign arb_axi_iommu_req.ar.ss_id_valid = '0;
-  assign arb_axi_iommu_req.ar.substream_id = '0;
+  assign arb_axi_iommu0_req.ar.stream_id = '0;
+  assign arb_axi_iommu0_req.ar.ss_id_valid = '0;
+  assign arb_axi_iommu0_req.ar.substream_id = '0;
+
+  // AW
+  assign arb_axi_iommu1_req.aw.stream_id = 1;
+  assign arb_axi_iommu1_req.aw.ss_id_valid = '0;
+  assign arb_axi_iommu1_req.aw.substream_id = '0;
+
+  // AR
+  assign arb_axi_iommu1_req.ar.stream_id = 1;
+  assign arb_axi_iommu1_req.ar.ss_id_valid = '0;
+  assign arb_axi_iommu1_req.ar.substream_id = '0;
 
   riscv_iommu #(
     .InclPC           ( 0                               ),
@@ -675,22 +622,66 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     .axi_req_iommu_t  ( axi_iommu_req_t                 ),
     .reg_req_t		    ( reg_req_t                       ),
     .reg_rsp_t		    ( reg_rsp_t                       )
-  ) i_cgra_iommu (
+  ) i_cgra_iommu0 (
     .clk_i            ( soc_clk ),
     .rst_ni           ( rst_n ),
     // Translation Request Interface (Slave)
-    .dev_tr_req_i		  ( arb_axi_iommu_req ),
-    .dev_tr_resp_o	  ( arb_axi_iommu_rsp ),
+    .dev_tr_req_i		  ( arb_axi_iommu0_req ),
+    .dev_tr_resp_o	  ( arb_axi_iommu0_rsp ),
     // Translation Completion Interface (Master)
-    .dev_comp_resp_i  ( axi_mst_rsp[FPGACfg.AxiExtRegionIdx[1]] ),
-    .dev_comp_req_o   ( axi_mst_req[FPGACfg.AxiExtRegionIdx[1]] ),
+    .dev_comp_resp_i  ( axi_mst_rsp[FPGACfg.AxiExtRegionIdx[2]] ),
+    .dev_comp_req_o   ( axi_mst_req[FPGACfg.AxiExtRegionIdx[2]] ),
     // Implicit Memory Accesses Interface (Master)
     .ds_resp_i			  ( axi_mst_rsp[FPGACfg.AxiExtRegionIdx[0]] ),
     .ds_req_o			    ( axi_mst_req[FPGACfg.AxiExtRegionIdx[0]] ),
     // Programming Interface (Slave) (AXI4 Full -> AXI4-Lite -> Reg IF)
     .prog_req_i			  ( axi_slv_req[FPGACfg.AxiExtRegionIdx[0]] ),
     .prog_resp_o		  ( axi_slv_rsp[FPGACfg.AxiExtRegionIdx[0]] ),
-    .wsi_wires_o 		  ( iommu_int )
+    .wsi_wires_o 		  ( iommu0_int )
+  );
+
+riscv_iommu #(
+    .InclPC           ( 0                               ),
+    .InclBC           ( 0                               ),
+    .InclDBG          ( 1                               ),
+    .N_INT_VEC        ( 4                               ),
+    .MSITrans         ( rv_iommu::MSI_FLAT_ONLY         ),
+    .IOTLB_ENTRIES    ( 8                               ),
+    .N_IOHPMCTR       ( 8                               ),
+    .IGS              ( rv_iommu::BOTH                  ),
+    .ADDR_WIDTH			  ( FPGACfg.AddrWidth               ),
+    .DATA_WIDTH			  ( FPGACfg.AxiDataWidth            ),
+    .ID_WIDTH			    ( FPGACfg.AxiMstIdWidth           ),
+    .ID_SLV_WIDTH		  ( AxiSlvIdWidth                   ),
+    .USER_WIDTH			  ( FPGACfg.AxiUserWidth            ),
+    .aw_chan_t			  ( axi_mst_aw_chan_t               ),
+    .w_chan_t			    ( axi_mst_w_chan_t                ),
+    .b_chan_t			    ( axi_mst_b_chan_t                ),
+    .ar_chan_t			  ( axi_mst_ar_chan_t               ),
+    .r_chan_t		      ( axi_mst_r_chan_t                ),
+    .axi_req_t			  ( axi_mst_req_t                   ),
+    .axi_rsp_t			  ( axi_mst_rsp_t                   ),
+    .axi_req_slv_t		( axi_slv_req_t                   ),
+    .axi_rsp_slv_t		( axi_slv_rsp_t                   ),
+    .axi_req_iommu_t  ( axi_iommu_req_t                 ),
+    .reg_req_t		    ( reg_req_t                       ),
+    .reg_rsp_t		    ( reg_rsp_t                       )
+  ) i_cgra_iommu1 (
+    .clk_i            ( soc_clk ),
+    .rst_ni           ( rst_n ),
+    // Translation Request Interface (Slave)
+    .dev_tr_req_i		  ( arb_axi_iommu1_req ),
+    .dev_tr_resp_o	  ( arb_axi_iommu1_rsp ),
+    // Translation Completion Interface (Master)
+    .dev_comp_resp_i  ( axi_mst_rsp[FPGACfg.AxiExtRegionIdx[3]] ),
+    .dev_comp_req_o   ( axi_mst_req[FPGACfg.AxiExtRegionIdx[3]] ),
+    // Implicit Memory Accesses Interface (Master)
+    .ds_resp_i			  ( axi_mst_rsp[FPGACfg.AxiExtRegionIdx[1]] ),
+    .ds_req_o			    ( axi_mst_req[FPGACfg.AxiExtRegionIdx[1]] ),
+    // Programming Interface (Slave) (AXI4 Full -> AXI4-Lite -> Reg IF)
+    .prog_req_i			  ( axi_slv_req[FPGACfg.AxiExtRegionIdx[1]] ),
+    .prog_resp_o		  ( axi_slv_rsp[FPGACfg.AxiExtRegionIdx[1]] ),
+    .wsi_wires_o 		  ( iommu1_int )
   );
 
 `endif
@@ -771,7 +762,7 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     .reg_ext_slv_req_o  ( ),
     .reg_ext_slv_rsp_i  ( '0 ),
   `ifdef USE_IOMMU_AND_CGRA
-    .intr_ext_i         ( { cgra1_int, cgra0_int, iommu_int } ),
+    .intr_ext_i         ( { cgra1_int, cgra0_int, iommu1_int, iommu0_int } ),
   `else
     .intr_ext_i         ( '0 ),
   `endif
