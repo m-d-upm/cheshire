@@ -579,8 +579,8 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   `AXI_ASSIGN_FROM_REQ(aux_axi_slaves[1], axi_slv_req[FPGACfg.AxiExtRegionIdx[1]])
   `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[1]], aux_axi_slaves[1])
 
-  `AXI_ASSIGN_TO_REQ(axi_mst_req[FPGACfg.AxiExtRegionIdx[1]], aux_axi_master);
-  `AXI_ASSIGN_FROM_RESP(aux_axi_master, axi_mst_rsp[FPGACfg.AxiExtRegionIdx[1]]);
+  `AXI_ASSIGN_TO_REQ(axi_mst_req[0], aux_axi_master);
+  `AXI_ASSIGN_FROM_RESP(aux_axi_master, axi_mst_rsp[0]);
 
 `ifdef USE_ETHERNET
   
