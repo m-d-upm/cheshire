@@ -19,6 +19,8 @@ create_clock -period $SYS_TCK -name sys_clk [get_ports sys_clk_p]
 set SOC_TCK 20.0
 set soc_clk [get_clocks -of_objects [get_pins i_clkwiz/clk_50]]
 
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets sys_clk]
+
 #set_property CLOCK_REGION X0Y3 [get_cells i_dram_wrapper/i_dram/u_mig7s_mig/temp_mon_enabled.u_tempmon/xadc_supplied_temperature.rst_r2_reg]
 
 set_property LOC MMCME2_ADV_X0Y1 [get_cells -hier -filter {NAME =~ */u_ddr3_infrastructure/gen_mmcm.mmcm_i}]
