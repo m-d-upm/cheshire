@@ -172,7 +172,7 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
 
   wire sys_clk;
   wire soc_clk;
-  wire usb_clk;
+  //wire usb_clk;
   wire phy_tx_clk;
   wire eth_clk;
   wire clk_200MHz;
@@ -775,7 +775,8 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
 `endif
     .uart_tx_o,
     .uart_rx_i,
-    .usb_clk_i          ( usb_clk ),
+    //.usb_clk_i          ( usb_clk ),
+    .usb_clk_i          ( '0 ),
     .usb_rst_ni         ( rst_n ), // Technically should sync to `usb_clk`, but pulse is long enough
     .usb_dm_i,
     .usb_dm_o,
