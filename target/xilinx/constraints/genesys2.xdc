@@ -21,11 +21,6 @@ set soc_clk [get_clocks -of_objects [get_pins i_clkwiz/clk_50]]
 
 set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets sys_clk]
 
-#set_property CLOCK_REGION X0Y3 [get_cells i_dram_wrapper/i_dram/u_mig7s_mig/temp_mon_enabled.u_tempmon/xadc_supplied_temperature.rst_r2_reg]
-
-set_property LOC MMCME2_ADV_X0Y1 [get_cells -hier -filter {NAME =~ */u_ddr3_infrastructure/gen_mmcm.mmcm_i}]
-#set_property LOC PLLE2_ADV_X0Y0 [get_cells -hier -filter {NAME =~ */u_ddr3_infrastructure/plle2_i}]
-
 ############
 # Switches #
 ############
@@ -111,19 +106,19 @@ set_false_path -hold -to [get_ports {i2c_scl_io i2c_sda_io}]
 # USB #
 #######
 
-set usb_clk [get_clocks -of_objects [get_pins i_clkwiz/clk_48]]
+# set usb_clk [get_clocks -of_objects [get_pins i_clkwiz/clk_48]]
 
 # `set_max_delay -datapath only` implicitly vaives all undesired checks between clocks (setup with
 # skew and hold). We assume here `soc_clk` is the faster clock, and allocate two thirds of its
 # period for the crossing.
-set_max_delay -datapath_only -from $usb_clk -to $soc_clk [expr { 0.67 * $SOC_TCK }]
-set_max_delay -datapath_only -from $soc_clk -to $usb_clk [expr { 0.67 * $SOC_TCK }]
+# set_max_delay -datapath_only -from $usb_clk -to $soc_clk [expr { 0.67 * $SOC_TCK }]
+# set_max_delay -datapath_only -from $soc_clk -to $usb_clk [expr { 0.67 * $SOC_TCK }]
 
-set_input_delay -min -clock $usb_clk [expr { 0.10 * $SOC_TCK }] [get_ports {usb_d*_i}]
-set_input_delay -max -clock $usb_clk [expr { 0.35 * $SOC_TCK }] [get_ports {usb_d*_i}]
+# set_input_delay -min -clock $usb_clk [expr { 0.10 * $SOC_TCK }] [get_ports {usb_d*_i}]
+# set_input_delay -max -clock $usb_clk [expr { 0.35 * $SOC_TCK }] [get_ports {usb_d*_i}]
 
-set_output_delay -min -clock $usb_clk [expr { 0.10 * $SOC_TCK }] [get_ports {usb_d*_o usb_d*_oe}]
-set_output_delay -max -clock $usb_clk [expr { 0.35 * $SOC_TCK }] [get_ports {usb_d*_o usb_d*_oe}]
+# set_output_delay -min -clock $usb_clk [expr { 0.10 * $SOC_TCK }] [get_ports {usb_d*_o usb_d*_oe}]
+# set_output_delay -max -clock $usb_clk [expr { 0.35 * $SOC_TCK }] [get_ports {usb_d*_o usb_d*_oe}]
 
 ###############
 # Assign Pins #
