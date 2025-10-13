@@ -152,10 +152,10 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     ret.AxiExtRegionIdx = '{0:0, 1:1, default:0};
     // 4K periphs @ AXI	from 0x0100_0000 to 0x0200_0000
     // DMA mapped from 0x0100_0000 to 0x0100_1000
-    // ETHERNET from 0x0100_1000 to 0x0101_1000
-    // CGRA from 0x0101_2000 to 0x0101_3000
-    ret.AxiExtRegionStart = '{0:'h0100_1000, 1:'h0101_1000, default:0}; 
-    ret.AxiExtRegionEnd = '{0:'h0101_1000, 1:'h0101_2000, default:0}; 
+    // ETHERNET from 0x0102_0000 to 0x0103_0000
+    // CGRA from 0x0100_1000 to 0x0100_2000
+    ret.AxiExtRegionStart = '{0:'h0102_0000, 1:'h0100_1000, default:0}; 
+    ret.AxiExtRegionEnd = '{0:'h0103_0000, 1:'h0100_2000, default:0}; 
   `endif
     return ret;
   endfunction
