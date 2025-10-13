@@ -29,7 +29,8 @@ update_compile_order -fileset sources_1
 # Set synthesis properties
 # TODO: investigate resource-affordable retiming
 set_property XPM_LIBRARIES XPM_MEMORY [current_project]
-set_property strategy Flow_PerfOptimized_high [get_runs synth_1]
+#set_property strategy Flow_PerfOptimized_high [get_runs synth_1]
+set_property strategy Flow_PerfThresholdCarry [get_runs synth_1]
 
 # Elaborate and open design to explore all clocks
 synth_design -rtl -name rtl_1
@@ -49,18 +50,12 @@ insert_ilas {soc_clk}
 
 # Set implementation properties
 #set_property strategy Performance_ExtraTimingOpt [get_runs impl_1]
-set_property strategy Performance_ExplorePostRoutePhysOpt [get_runs impl_1]
+set_property strategy Flow_RunPostRoutePhysOpt [get_runs impl_1]
 
 # Implementation
 launch_runs -jobs $num_jobs impl_1 -to_step write_bitstream
 wait_on_run impl_1
 open_run impl_1
-
-# Run physical optimization for aggressive hold fixing
-phys_opt_design -aggressive_hold_fix
-
-# Write the bitstream again after hold fix (overwrite)
-write_bitstream -force ${project_root}/${proj}.runs/impl_1/cheshire_top_xilinx.bit
 
 # Generate implementation reports
 gen_reports ${project_root}/reports.impl
