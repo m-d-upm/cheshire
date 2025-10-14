@@ -108,15 +108,11 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   inout  wire [UsbNumPorts-1:0] usb_dp_io
 );
 
-`ifdef USE_IOMMU
-  `ifdef USE_CGRA
-    `define USE_IOMMU_AND_CGRA
-  `endif
-`endif
-
 `ifdef USE_ETHERNET
   `ifdef USE_CGRA
-    `define USE_ETHERNET_AND_CGRA
+      `ifdef USE_CGRA
+        `define USE_ETHERNET_IOMMU_AND_CGRA
+      `endif  
   `endif
 `endif
 
@@ -144,18 +140,19 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   `else
     ret.I2c = 0;
   `endif
-  `ifdef USE_ETHERNET_AND_CGRA
-    ret.NumExtInIntrs = 3; // ETHERNET + STRELA
-    ret.AxiExtNumMst = 1; // STRELA x2
-    ret.AxiExtNumSlv = 2; // ETHERNET + STRELA
-    ret.AxiExtNumRules = 2; // ETHERNET + STRELA x2
-    ret.AxiExtRegionIdx = '{0:0, 1:1, default:0};
+  `ifdef USE_ETHERNET_IOMMU_AND_CGRA
+    ret.NumExtInIntrs = 7; // ETHERNET + STRELA + IOMMU
+    ret.AxiExtNumMst = 2; // IOMMU x2
+    ret.AxiExtNumSlv = 3; // ETHERNET + STRELA + IOMMU
+    ret.AxiExtNumRules = 3; // ETHERNET + STRELA + IOMMU
+    ret.AxiExtRegionIdx = '{0:0, 1:1, 2:2, default:0};
     // 4K periphs @ AXI	from 0x0100_0000 to 0x0200_0000
     // DMA mapped from 0x0100_0000 to 0x0100_1000
     // ETHERNET from 0x0102_0000 to 0x0103_0000
-    // CGRA from 0x0100_1000 to 0x0100_2000
-    ret.AxiExtRegionStart = '{0:'h0102_0000, 1:'h0100_1000, default:0}; 
-    ret.AxiExtRegionEnd = '{0:'h0103_0000, 1:'h0100_2000, default:0}; 
+    // IOMMU from 0x0100_1000 to 0x0100_2000
+    // CGRA from 0x0100_2000 to 0x0100_3000
+    ret.AxiExtRegionStart = '{0:'h0102_0000, 1:'h0100_1000, 2:'h0100_2000, default:0}; 
+    ret.AxiExtRegionEnd = '{0:'h0103_0000, 1:'h0100_2000, 2:'h0100_3000, default:0}; 
   `endif
     return ret;
   endfunction
@@ -575,12 +572,15 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
       .AXI_USER_WIDTH ( FPGACfg.AxiUserWidth     )
   ) aux_axi_master();
 
-   // attach CGRA req/rsp interface to the req/rsp struct signals
-  `AXI_ASSIGN_FROM_REQ(aux_axi_slaves[1], axi_slv_req[FPGACfg.AxiExtRegionIdx[1]])
-  `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[1]], aux_axi_slaves[1])
+  axi_iommu_req_t arb_axi_iommu_req;
+  axi_iommu_rsp_t arb_axi_iommu_rsp;
 
-  `AXI_ASSIGN_TO_REQ(axi_mst_req[0], aux_axi_master);
-  `AXI_ASSIGN_FROM_RESP(aux_axi_master, axi_mst_rsp[0]);
+  `AXI_ASSIGN_TO_REQ(arb_axi_iommu_req, aux_axi_master);
+  `AXI_ASSIGN_FROM_RESP(aux_axi_master, arb_axi_iommu_rsp);
+
+  // attach CGRA req/rsp interface to the req/rsp struct signals
+  `AXI_ASSIGN_FROM_REQ(aux_axi_slaves[1], axi_slv_req[FPGACfg.AxiExtRegionIdx[2]])
+  `AXI_ASSIGN_TO_RESP(axi_slv_rsp[FPGACfg.AxiExtRegionIdx[2]], aux_axi_slaves[1])
 
 `ifdef USE_ETHERNET
   
@@ -662,12 +662,70 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
 
 `endif
   
-  ///////////////////
+   ///////////////////
   //     IOMMU     //
   ///////////////////
 
-  // TO-DO: check if it can be fitted into this design, just a placeholder for now 
+`ifdef USE_IOMMU
 
+  logic [3:0] iommu_int; // for interrupts
+
+  // AW
+  assign arb_axi_iommu_req.aw.stream_id = '0;
+  assign arb_axi_iommu_req.aw.ss_id_valid = '0;
+  assign arb_axi_iommu_req.aw.substream_id = '0;
+
+  // AR
+  assign arb_axi_iommu_req.ar.stream_id = '0;
+  assign arb_axi_iommu_req.ar.ss_id_valid = '0;
+  assign arb_axi_iommu_req.ar.substream_id = '0;
+
+  riscv_iommu #(
+    .InclPC           ( 0                               ),
+    .InclBC           ( 0                               ),
+    .InclDBG          ( 1                               ),
+    .N_INT_VEC        ( 4                               ),
+    .MSITrans         ( rv_iommu::MSI_FLAT_ONLY         ),
+    .IOTLB_ENTRIES    ( 8                               ),
+    .N_IOHPMCTR       ( 8                               ),
+    .IGS              ( rv_iommu::BOTH                  ),
+    .ADDR_WIDTH			  ( FPGACfg.AddrWidth               ),
+    .DATA_WIDTH			  ( FPGACfg.AxiDataWidth            ),
+    .ID_WIDTH			    ( FPGACfg.AxiMstIdWidth           ),
+    .ID_SLV_WIDTH		  ( AxiSlvIdWidth                   ),
+    .USER_WIDTH			  ( FPGACfg.AxiUserWidth            ),
+    .aw_chan_t			  ( axi_mst_aw_chan_t               ),
+    .w_chan_t			    ( axi_mst_w_chan_t                ),
+    .b_chan_t			    ( axi_mst_b_chan_t                ),
+    .ar_chan_t			  ( axi_mst_ar_chan_t               ),
+    .r_chan_t		      ( axi_mst_r_chan_t                ),
+    .axi_req_t			  ( axi_mst_req_t                   ),
+    .axi_rsp_t			  ( axi_mst_rsp_t                   ),
+    .axi_req_slv_t		( axi_slv_req_t                   ),
+    .axi_rsp_slv_t		( axi_slv_rsp_t                   ),
+    .axi_req_iommu_t  ( axi_iommu_req_t                 ),
+    .reg_req_t		    ( reg_req_t                       ),
+    .reg_rsp_t		    ( reg_rsp_t                       )
+  ) i_cgra_iommu (
+    .clk_i            ( soc_clk ),
+    .rst_ni           ( rst_n ),
+    // Translation Request Interface (Slave)
+    .dev_tr_req_i		  ( arb_axi_iommu_req ),
+    .dev_tr_resp_o	  ( arb_axi_iommu_rsp ),
+    // Translation Completion Interface (Master)
+    .dev_comp_resp_i  ( axi_mst_rsp[FPGACfg.AxiExtRegionIdx[1]] ),
+    .dev_comp_req_o   ( axi_mst_req[FPGACfg.AxiExtRegionIdx[1]] ),
+    // Implicit Memory Accesses Interface (Master)
+    .ds_resp_i			  ( axi_mst_rsp[FPGACfg.AxiExtRegionIdx[0]] ),
+    .ds_req_o			    ( axi_mst_req[FPGACfg.AxiExtRegionIdx[0]] ),
+    // Programming Interface (Slave) (AXI4 Full -> AXI4-Lite -> Reg IF)
+    .prog_req_i			  ( axi_slv_req[FPGACfg.AxiExtRegionIdx[1]] ),
+    .prog_resp_o		  ( axi_slv_rsp[FPGACfg.AxiExtRegionIdx[1]] ),
+    .wsi_wires_o 		  ( iommu_int )
+  );
+
+`endif
+  
 `ifdef USE_CGRA
 
   ///////////////////
@@ -715,7 +773,7 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
     .rtc_i              ( rtc_clk_q       ),
     .axi_llc_mst_req_o  ( axi_llc_mst_req ),
     .axi_llc_mst_rsp_i  ( axi_llc_mst_rsp ),
-  `ifdef USE_ETHERNET_AND_CGRA
+  `ifdef USE_ETHERNET_IOMMU_AND_CGRA
     .axi_ext_mst_req_i  ( axi_mst_req ),
     .axi_ext_mst_rsp_o  ( axi_mst_rsp ),
     .axi_ext_slv_req_o  ( axi_slv_req ),
@@ -728,8 +786,8 @@ module cheshire_top_xilinx import cheshire_pkg::*; (
   `endif
     .reg_ext_slv_req_o  ( ),
     .reg_ext_slv_rsp_i  ( '0 ),
-  `ifdef USE_ETHERNET_AND_CGRA
-    .intr_ext_i         ( { cgra_int, eth_irq } ),
+  `ifdef USE_ETHERNET_IOMMU_AND_CGRA
+    .intr_ext_i         ( { cgra_int, iommu_int, eth_irq } ),
   `else
     .intr_ext_i         ( '0 ),
   `endif

@@ -28,7 +28,7 @@
   //`define USE_USB
   `define USE_STARTUPE2
   `define USE_QSPI
-  //`define USE_IOMMU
+  `define USE_IOMMU
   `define USE_CGRA
   `define USE_ETHERNET
 `endif
