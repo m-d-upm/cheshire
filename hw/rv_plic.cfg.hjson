@@ -7,7 +7,7 @@
 {
     instance_name: "rv_plic",
     param_values: {
-        src: 61, // originally 58, bumped to 61 because of the 2-bit CGRA and 1-bit Ethernet IRQ interfaces   
+        src: 65, // originally 58, bumped to 65 because of the 2-bit CGRA, 4-bit IOMMU and 1-bit Ethernet IRQ interfaces   
         target: 2,  // We need *two targets* per hart: M and S modes
         prio: 7,
         nonstd_regs: 0  // Do *not* include these: MSIPs are not used and we use a 64 MiB address space
