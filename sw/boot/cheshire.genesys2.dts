@@ -35,14 +35,23 @@
    * };
   */
   PLIC0: interrupt-controller@4000000 {
-    riscv,ndev = <60>;
+    riscv,ndev = <64>;
   };
-  strela@1001000 {
+  riscv_iommu: iommu@1001000 {
+    compatible = "riscv,iommu";
+    reg = <0x0 0x1001000 0x0 0x1000>;
+    interrupts = <59 60 61>; // 62 unused, skipped
+    interrupt-names = "cmdq", "fltq", "hpm";
+    interrupt-parent = <&PLIC0>;
+    #iommu-cells = <1>;
+  };
+  strela@1002000 {
     compatible = "cei,strela";
     interrupt-parent = <&PLIC0>;
     interrupt-names = "config_done", "exec_done";
-    interrupts = <59 60>;
-    reg = <0x0 0x1001000 0x0 0x1000>;
+    interrupts = <63 64>;
+    reg = <0x0 0x1002000 0x0 0x1000>;
+    iommus = <&riscv_iommu 0>;
   };
   eth: lowrisc-eth@1020000 {
       compatible = "lowrisc-eth";  
@@ -50,7 +59,6 @@
       interrupt-parent = <&PLIC0>;   
       interrupts = <58>;
       local-mac-address = [00 18 3e 02 e3 7f]; // This needs to change if more than one GenesysII on a VLAN
-      //reg = <0x0 0x3010000 0x0 0x10000>; 
       reg = <0x0 0x1020000 0x0 0x10000>; 
   };
 };
