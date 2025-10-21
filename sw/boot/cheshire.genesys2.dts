@@ -58,7 +58,7 @@
       device_type = "network";   
       interrupt-parent = <&PLIC0>;   
       interrupts = <58>;
-      local-mac-address = [00 18 3e 02 e3 7f]; // This needs to change if more than one GenesysII on a VLAN
+      local-mac-address = [00 18 3e 02 e3 8f]; // This needs to change if more than one GenesysII on a VLAN
       reg = <0x0 0x1020000 0x0 0x10000>; 
   };
 };
